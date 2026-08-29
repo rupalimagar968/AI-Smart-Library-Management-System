@@ -5,14 +5,8 @@ on:
     branches:
       - main
 
-  workflow_dispatch:
-
 permissions:
   contents: read
-
-concurrency:
-  group: smart-library-main
-  cancel-in-progress: true
 
 jobs:
 
@@ -21,23 +15,28 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Check Docker
         shell: powershell
-        run: docker --version
-
-      - name: Stop Existing Backend
-        shell: powershell
         run: |
-          docker rm -f smart-library-backend 2>$null
-          exit 0
+          docker --version
+          docker info --format "Docker Server: {{.ServerVersion}}"
 
       - name: Build Backend Image
         shell: powershell
         run: |
           docker build -t ai-smart-library-backend:latest ./backend
+
+      - name: Remove Old Backend Container
+        shell: powershell
+        run: |
+          $container = docker ps -aq -f "name=^smart-library-backend$"
+          if ($container) {
+              docker rm -f smart-library-backend
+          }
+          exit 0
 
       - name: Start Backend Container
         shell: powershell
@@ -50,7 +49,31 @@ jobs:
       - name: Wait for Backend
         shell: powershell
         run: |
-          Start-Sleep -Seconds 10
+          $maxAttempts = 30
+
+          for ($i = 1; $i -le $maxAttempts; $i++) {
+              try {
+                  $response = Invoke-WebRequest `
+                    -Uri "http://localhost:5000/health" `
+                    -UseBasicParsing `
+                    -TimeoutSec 5
+
+                  if ($response.StatusCode -eq 200) {
+                      Write-Host "Backend is healthy."
+                      exit 0
+                  }
+              }
+              catch {
+                  Write-Host "Backend not ready. Attempt $i/$maxAttempts"
+              }
+
+              Start-Sleep -Seconds 2
+          }
+
+          Write-Host "Backend failed health check."
+          docker ps -a
+          docker logs smart-library-backend
+          exit 1
 
       - name: Backend Health Check
         shell: powershell
@@ -61,41 +84,47 @@ jobs:
 
           Write-Host $response.Content
 
-          if ($response.StatusCode -ne 200) {
-            throw "Backend health check failed"
-          }
-
       - name: Backend Container Status
         if: always()
         shell: powershell
         run: |
           docker ps -a
-          docker logs smart-library-backend 2>&1
-          exit 0
+
+      - name: Backend Logs On Failure
+        if: failure()
+        shell: powershell
+        run: |
+          docker logs smart-library-backend
 
 
   frontend-build:
     name: Frontend Build
     runs-on: self-hosted
+    needs: backend-build
 
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Check Docker
         shell: powershell
-        run: docker --version
-
-      - name: Stop Existing Frontend
-        shell: powershell
         run: |
-          docker rm -f smart-library-frontend 2>$null
-          exit 0
+          docker --version
+          docker info --format "Docker Server: {{.ServerVersion}}"
 
       - name: Build Frontend Image
         shell: powershell
         run: |
           docker build -t ai-smart-library-frontend:latest ./frontend
+
+      - name: Remove Old Frontend Container
+        shell: powershell
+        run: |
+          $container = docker ps -aq -f "name=^smart-library-frontend$"
+          if ($container) {
+              docker rm -f smart-library-frontend
+          }
+          exit 0
 
       - name: Start Frontend Container
         shell: powershell
@@ -108,43 +137,49 @@ jobs:
       - name: Wait for Frontend
         shell: powershell
         run: |
-          Start-Sleep -Seconds 5
+          $maxAttempts = 30
+
+          for ($i = 1; $i -le $maxAttempts; $i++) {
+              try {
+                  $response = Invoke-WebRequest `
+                    -Uri "http://localhost:8080" `
+                    -UseBasicParsing `
+                    -TimeoutSec 5
+
+                  if ($response.StatusCode -eq 200) {
+                      Write-Host "Frontend is healthy."
+                      exit 0
+                  }
+              }
+              catch {
+                  Write-Host "Frontend not ready. Attempt $i/$maxAttempts"
+              }
+
+              Start-Sleep -Seconds 2
+          }
+
+          Write-Host "Frontend failed health check."
+          docker ps -a
+          docker logs smart-library-frontend
+          exit 1
 
       - name: Frontend Health Check
         shell: powershell
         run: |
           $response = Invoke-WebRequest `
-            -Uri "http://localhost:8080/" `
+            -Uri "http://localhost:8080" `
             -UseBasicParsing
 
-          Write-Host "Frontend Status: $($response.StatusCode)"
-
-          if ($response.StatusCode -ne 200) {
-            throw "Frontend health check failed"
-          }
+          Write-Host "Frontend HTTP Status: $($response.StatusCode)"
 
       - name: Frontend Container Status
         if: always()
         shell: powershell
         run: |
           docker ps -a
-          docker logs smart-library-frontend 2>&1
-          exit 0
 
-
-  deployment-status:
-    name: Deployment Status
-    runs-on: self-hosted
-    needs:
-      - backend-build
-      - frontend-build
-
-    steps:
-      - name: Deployment Successful
+      - name: Frontend Logs On Failure
+        if: failure()
         shell: powershell
         run: |
-          Write-Host "===================================="
-          Write-Host " Smart Library Deployment Successful"
-          Write-Host "===================================="
-
-          docker ps
+          docker logs smart-library-frontend
