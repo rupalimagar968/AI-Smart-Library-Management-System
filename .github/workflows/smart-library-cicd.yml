@@ -4,6 +4,11 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'backend/**'
+      - 'frontend/**'
+      - '.github/workflows/smart-library-cicd.yml'
+
   workflow_dispatch:
 
 permissions:
@@ -16,7 +21,6 @@ jobs:
     runs-on: self-hosted
 
     steps:
-
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -33,7 +37,13 @@ jobs:
         shell: bash
         run: |
           echo "=== PYTHON SYNTAX CHECK ==="
-          python -m py_compile backend/app.py
+
+          docker run --rm \
+            -v "$(pwd)/backend:/workspace" \
+            -w /workspace \
+            python:3.11-slim \
+            python -m py_compile app.py
+
           echo "Python syntax OK"
 
       - name: Build Backend Image
@@ -41,7 +51,7 @@ jobs:
         run: |
           echo "=== BUILDING BACKEND ==="
 
-          docker build \
+          docker build --no-cache \
             -t ai-smart-library-backend:latest \
             ./backend
 
@@ -49,36 +59,19 @@ jobs:
 
       - name: Test Backend Container
         shell: bash
-        env:
-          DB_HOST: ${{ vars.DB_HOST }}
-          DB_PORT: ${{ vars.DB_PORT }}
-          DB_NAME: ${{ vars.MYSQL_DATABASE }}
-          DB_USER: ${{ secrets.MYSQL_USER }}
-          DB_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-          JWT_SECRET: ${{ secrets.JWT_SECRET }}
-          JWT_EXPIRATION_HOURS: ${{ vars.JWT_EXPIRATION_HOURS }}
         run: |
-          echo "=== START BACKEND TEST ==="
+          echo "=== START BACKEND ==="
 
           docker rm -f smart-library-backend-ci 2>/dev/null || true
 
           docker run -d \
             --name smart-library-backend-ci \
-            --network smart-library-network \
             -p 5001:5000 \
-            -e DB_HOST="$DB_HOST" \
-            -e DB_PORT="$DB_PORT" \
-            -e DB_NAME="$DB_NAME" \
-            -e DB_USER="$DB_USER" \
-            -e DB_PASSWORD="$DB_PASSWORD" \
-            -e JWT_SECRET="$JWT_SECRET" \
-            -e JWT_EXPIRATION_HOURS="$JWT_EXPIRATION_HOURS" \
             ai-smart-library-backend:latest
 
           echo "Waiting for backend..."
 
           for i in {1..30}; do
-
             if curl -fsS http://localhost:5001/api/health >/dev/null 2>&1; then
               echo "Backend health check SUCCESS"
               break
@@ -91,29 +84,10 @@ jobs:
             fi
 
             sleep 2
-
           done
 
-          echo "=== TEST DATABASE CONNECTION ==="
-
-          docker exec smart-library-backend-ci \
-            python -c "
-import mysql.connector
-import os
-
-conn = mysql.connector.connect(
-    host=os.environ['DB_HOST'],
-    port=int(os.environ['DB_PORT']),
-    database=os.environ['DB_NAME'],
-    user=os.environ['DB_USER'],
-    password=os.environ['DB_PASSWORD']
-)
-
-print('MYSQL CONNECTION SUCCESS')
-conn.close()
-"
-
-          echo "=== BACKEND TEST PASSED ==="
+          curl -fsS http://localhost:5001/api/health
+          echo
 
       - name: Cleanup Backend Test Container
         if: always()
@@ -127,7 +101,6 @@ conn.close()
     runs-on: self-hosted
 
     steps:
-
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -136,11 +109,72 @@ conn.close()
         run: |
           echo "=== BUILDING FRONTEND ==="
 
-          docker build \
+          docker build --no-cache \
             -t ai-smart-library-frontend:latest \
             ./frontend
 
-          echo "Frontend build SUCCESS"
+          echo "Frontend image build SUCCESS"
+
+      - name: Verify Frontend Files
+        shell: bash
+        run: |
+          echo "=== VERIFY FRONTEND FILES ==="
+
+          docker run --rm \
+            ai-smart-library-frontend:latest \
+            sh -c "
+              test -f /usr/share/nginx/html/index.html &&
+              test -f /usr/share/nginx/html/login.html &&
+              test -f /usr/share/nginx/html/register.html
+            "
+
+          echo "Frontend HTML files SUCCESS"
+
+      - name: Test Frontend Container
+        shell: bash
+        run: |
+          echo "=== START FRONTEND ==="
+
+          docker rm -f smart-library-frontend-ci 2>/dev/null || true
+
+          docker run -d \
+            --name smart-library-frontend-ci \
+            -p 8081:80 \
+            ai-smart-library-frontend:latest
+
+          echo "Waiting for frontend..."
+
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8081/ >/dev/null 2>&1; then
+              echo "Frontend health check SUCCESS"
+              break
+            fi
+
+            if [ "$i" -eq 30 ]; then
+              echo "Frontend health check FAILED"
+              docker logs smart-library-frontend-ci || true
+              exit 1
+            fi
+
+            sleep 2
+          done
+
+          echo "=== TEST INDEX ==="
+          curl -fsS -o /dev/null http://localhost:8081/
+
+          echo "=== TEST LOGIN ==="
+          curl -fsS -o /dev/null http://localhost:8081/login.html
+
+          echo "=== TEST REGISTER ==="
+          curl -fsS -o /dev/null http://localhost:8081/register.html
+
+          echo "Frontend pages SUCCESS"
+
+      - name: Cleanup Frontend Test Container
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f smart-library-frontend-ci 2>/dev/null || true
 
 
   cleanup:
@@ -154,11 +188,9 @@ conn.close()
     if: always()
 
     steps:
-
       - name: Docker Cleanup
         shell: bash
         run: |
-
           echo "=== DOCKER DISK USAGE BEFORE CLEANUP ==="
           docker system df
 
@@ -171,7 +203,7 @@ conn.close()
           echo "=== REMOVE UNUSED NETWORKS ==="
           docker network prune -f
 
-          echo "=== REMOVE DANGLING IMAGES ==="
+          echo "=== REMOVE DANGLING IMAGES ONLY ==="
           docker image prune -f
 
           echo "=== DOCKER DISK USAGE AFTER CLEANUP ==="

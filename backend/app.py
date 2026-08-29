@@ -16,7 +16,7 @@ JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 
 def get_db_connection():
     return mysql.connector.connect(
-        host=os.getenv("DB_HOST", "smart-library-mysql"),
+        host=os.getenv("DB_HOST", "localhost"),
         port=int(os.getenv("DB_PORT", "3306")),
         database=os.getenv("DB_NAME", "smart_library"),
         user=os.getenv("DB_USER", "library_user"),
@@ -105,6 +105,9 @@ def register():
         }), 201
 
     except mysql.connector.Error as error:
+        if connection:
+            connection.rollback()
+
         return jsonify({
             "success": False,
             "message": "Database error",
