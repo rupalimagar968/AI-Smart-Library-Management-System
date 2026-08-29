@@ -5,40 +5,62 @@ on:
     branches:
       - main
 
+  workflow_dispatch:
+
 permissions:
   contents: read
 
 jobs:
+
   backend-build:
     name: Backend Build
     runs-on: self-hosted
 
     steps:
-      - name: Checkout code
+
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Check Docker
+      - name: Docker Check
         shell: bash
         run: |
           echo "=== DOCKER VERSION ==="
           docker --version
+
           echo "=== DOCKER SERVER ==="
           docker info --format 'Docker Server: {{.ServerVersion}}'
+
           echo "=== DOCKER CONTEXT ==="
           docker context show
 
-      - name: Build Backend Image
+      - name: Validate Backend
+        shell: bash
+        run: |
+          echo "=== PYTHON SYNTAX CHECK ==="
+
+          docker run --rm \
+            -v "$PWD/backend:/app" \
+            -w /app \
+            python:3.11-slim \
+            python -m py_compile app.py
+
+          echo "Backend Python syntax OK."
+
+      - name: Build Backend
         shell: bash
         run: |
           echo "=== BUILDING BACKEND ==="
-          docker build --no-cache -t ai-smart-library-backend:latest ./backend
 
-      - name: Remove Old Backend Container
+          docker build --no-cache \
+            -t ai-smart-library-backend:latest \
+            ./backend
+
+      - name: Remove Old Backend Application Container
         shell: bash
         run: |
           docker rm -f smart-library-backend 2>/dev/null || true
 
-      - name: Start Backend Container
+      - name: Start Backend
         shell: bash
         run: |
           docker run -d \
@@ -46,62 +68,74 @@ jobs:
             -p 5000:5000 \
             ai-smart-library-backend:latest
 
-      - name: Wait For Backend
-        shell: bash
-        run: |
-          sleep 5
-
       - name: Backend Health Check
         shell: bash
         run: |
           echo "=== BACKEND HEALTH CHECK ==="
-          response=$(curl -s -o /tmp/backend_response.txt -w "%{http_code}" http://localhost:5000/api/health)
-          echo "HTTP Status: $response"
-          cat /tmp/backend_response.txt
 
-          if [ "$response" != "200" ]; then
-            echo "Backend health check FAILED"
-            exit 1
-          fi
+          for i in {1..30}; do
+            if curl -fsS http://localhost:5000/api/health; then
+              echo ""
+              echo "Backend is healthy."
+              exit 0
+            fi
 
-          echo "Backend health check PASSED"
+            echo "Waiting for backend... attempt $i/30"
+            sleep 2
+          done
 
-      - name: Backend Container Status
+          echo "Backend health check FAILED."
+
+          docker logs smart-library-backend || true
+
+          exit 1
+
+      - name: Backend Logs
+        if: always()
         shell: bash
         run: |
-          docker ps -a --filter "name=smart-library-backend"
+          docker logs smart-library-backend || true
+
 
   frontend-build:
     name: Frontend Build
     runs-on: self-hosted
-    needs: backend-build
+
+    needs:
+      - backend-build
 
     steps:
-      - name: Checkout code
+
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Check Docker
+      - name: Docker Check
         shell: bash
         run: |
           echo "=== DOCKER VERSION ==="
           docker --version
+
           echo "=== DOCKER SERVER ==="
           docker info --format 'Docker Server: {{.ServerVersion}}'
+
           echo "=== DOCKER CONTEXT ==="
           docker context show
 
-      - name: Build Frontend Image
+      - name: Build Frontend
         shell: bash
         run: |
           echo "=== BUILDING FRONTEND ==="
-          docker build --no-cache -t ai-smart-library-frontend:latest ./frontend
 
-      - name: Remove Old Frontend Container
+          docker build --no-cache \
+            -t ai-smart-library-frontend:latest \
+            ./frontend
+
+      - name: Remove Old Frontend Application Container
         shell: bash
         run: |
           docker rm -f smart-library-frontend 2>/dev/null || true
 
-      - name: Start Frontend Container
+      - name: Start Frontend
         shell: bash
         run: |
           docker run -d \
@@ -109,32 +143,96 @@ jobs:
             -p 8080:80 \
             ai-smart-library-frontend:latest
 
-      - name: Wait For Frontend
-        shell: bash
-        run: |
-          sleep 5
-
       - name: Frontend Health Check
         shell: bash
         run: |
           echo "=== FRONTEND HEALTH CHECK ==="
-          response=$(curl -s -o /tmp/frontend_response.txt -w "%{http_code}" http://localhost:8080)
-          echo "HTTP Status: $response"
 
-          if [ "$response" != "200" ]; then
-            echo "Frontend health check FAILED"
-            exit 1
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8080/ > /dev/null; then
+              echo "Frontend is healthy."
+              exit 0
+            fi
+
+            echo "Waiting for frontend... attempt $i/30"
+            sleep 2
+          done
+
+          echo "Frontend health check FAILED."
+
+          docker logs smart-library-frontend || true
+
+          exit 1
+
+      - name: Frontend Logs
+        if: always()
+        shell: bash
+        run: |
+          docker logs smart-library-frontend || true
+
+
+  cleanup:
+    name: Safe Docker Cleanup
+    runs-on: self-hosted
+
+    needs:
+      - backend-build
+      - frontend-build
+
+    if: success()
+
+    steps:
+
+      - name: Verify MySQL Is Untouched
+        shell: bash
+        run: |
+          echo "=== MYSQL PROTECTION CHECK ==="
+
+          if docker image inspect mysql:8.0 >/dev/null 2>&1; then
+            echo "mysql:8.0 image exists."
+          else
+            echo "WARNING: mysql:8.0 image not found."
           fi
 
-          echo "Frontend health check PASSED"
+          echo "=== MYSQL CONTAINERS ==="
+          docker ps -a --filter "ancestor=mysql:8.0"
 
-      - name: Frontend Container Status
+      - name: Remove Stopped Containers
         shell: bash
         run: |
-          docker ps -a --filter "name=smart-library-frontend"
+          echo "=== REMOVING STOPPED CONTAINERS ==="
 
-      - name: Final Container Status
+          docker container prune -f
+
+      - name: Remove Dangling Images Only
         shell: bash
         run: |
-          echo "=== ALL CONTAINERS ==="
+          echo "=== REMOVING DANGLING IMAGES ONLY ==="
+
+          docker image prune -f
+
+      - name: Remove Unused Build Cache
+        shell: bash
+        run: |
+          echo "=== REMOVING UNUSED BUILD CACHE ==="
+
+          docker builder prune -f
+
+      - name: Verify MySQL Image
+        shell: bash
+        run: |
+          echo "=== MYSQL IMAGE AFTER CLEANUP ==="
+
+          docker image inspect mysql:8.0 \
+            --format 'MySQL image exists: {{.RepoTags}}'
+
+      - name: Final Docker Usage
+        shell: bash
+        run: |
+          echo "=== FINAL DOCKER USAGE ==="
+
+          docker system df
+
+          echo "=== RUNNING CONTAINERS ==="
+
           docker ps

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account - Smart Library</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="auth-container">
+    <div class="auth-card">
+        <h1>📚 Smart Library</h1>
+        <h2>Create Account</h2>
+
+        <form id="registerForm">
+            <input
+                type="text"
+                id="username"
+                placeholder="Username"
+                required
+            >
+
+            <input
+                type="password"
+                id="password"
+                placeholder="Password"
+                minlength="6"
+                required
+            >
+
+            <input
+                type="password"
+                id="confirmPassword"
+                placeholder="Confirm Password"
+                minlength="6"
+                required
+            >
+
+            <button type="submit">Create Account</button>
+        </form>
+
+        <p id="message"></p>
+
+        <p>
+            Already have an account?
+            <a href="login.html">Login</a>
+        </p>
+    </div>
+</div>
+
+<script>
+const API_URL = "http://localhost:5000";
+
+document.getElementById("registerForm").addEventListener("submit", async function(e) {
+    e.preventDefault();
+
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+    const confirmPassword = document.getElementById("confirmPassword").value;
+    const message = document.getElementById("message");
+
+    if (password !== confirmPassword) {
+        message.textContent = "Passwords do not match.";
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_URL}/api/register`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                username: username,
+                password: password
+            })
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+            message.textContent = data.message;
+
+            setTimeout(function() {
+                window.location.href = "login.html";
+            }, 1000);
+
+        } else {
+            message.textContent = data.message || "Registration failed.";
+        }
+
+    } catch (error) {
+        message.textContent = "Unable to connect to backend.";
+        console.error(error);
+    }
+});
+</script>
+
+</body>
+</html>
