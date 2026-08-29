@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+```
+<title>AI Smart Library</title>
+
+<link rel="stylesheet" href="css/style.css">
+```
+
+</head>
+
+<body>
+
+```
+<!-- Navigation -->
+<header class="navbar">
+    <div class="logo">
+        📚 AI Smart Library
+    </div>
+
+    <nav>
+        <a href="#home">Home</a>
+        <a href="#books">Books</a>
+        <a href="#about">About</a>
+        <button onclick="openLogin()">Login</button>
+    </nav>
+</header>
+
+
+<!-- Hero Section -->
+<section id="home" class="hero">
+
+    <div class="hero-content">
+
+        <h1>
+            Welcome to <span>AI Smart Library</span>
+        </h1>
+
+        <p>
+            Discover, search and manage your books with
+            an intelligent digital library system.
+        </p>
+
+        <div class="hero-buttons">
+            <button onclick="exploreBooks()">
+                Explore Books
+            </button>
+
+            <button class="ai-button" onclick="openChatbot()">
+                🤖 Ask AI
+            </button>
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- Features -->
+<section class="features">
+
+    <h2>Smart Library Features</h2>
+
+    <div class="feature-container">
+
+        <div class="feature-card">
+            <div class="icon">📖</div>
+            <h3>Book Management</h3>
+            <p>
+                Easily search and manage books digitally.
+            </p>
+        </div>
+
+        <div class="feature-card">
+            <div class="icon">🤖</div>
+            <h3>AI Assistant</h3>
+            <p>
+                Ask questions and get intelligent library assistance.
+            </p>
+        </div>
+
+        <div class="feature-card">
+            <div class="icon">🔍</div>
+            <h3>Smart Search</h3>
+            <p>
+                Find books quickly using intelligent search.
+            </p>
+        </div>
+
+        <div class="feature-card">
+            <div class="icon">📊</div>
+            <h3>Admin Dashboard</h3>
+            <p>
+                Manage books, students and library activities.
+            </p>
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- Books -->
+<section id="books" class="books">
+
+    <h2>Popular Books</h2>
+
+    <div class="book-container">
+
+        <div class="book-card">
+            <h3>Python Programming</h3>
+            <p>Author: Mark Lutz</p>
+            <span>Available</span>
+        </div>
+
+        <div class="book-card">
+            <h3>Artificial Intelligence</h3>
+            <p>Author: Stuart Russell</p>
+            <span>Available</span>
+        </div>
+
+        <div class="book-card">
+            <h3>Clean Code</h3>
+            <p>Author: Robert C. Martin</p>
+            <span>Available</span>
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- About -->
+<section id="about" class="about">
+
+    <h2>About AI Smart Library</h2>
+
+    <p>
+        AI Smart Library is a modern three-tier library
+        management system designed for students, librarians
+        and administrators.
+    </p>
+
+</section>
+
+
+<!-- Login Modal -->
+<div id="loginModal" class="modal">
+
+    <div class="modal-content">
+
+        <span class="close" onclick="closeLogin()">×</span>
+
+        <h2>Login</h2>
+
+        <input
+            type="email"
+            placeholder="Email"
+            id="email"
+        >
+
+        <input
+            type="password"
+            placeholder="Password"
+            id="password"
+        >
+
+        <button onclick="login()">
+            Login
+        </button>
+
+    </div>
+
+</div>
+
+
+<!-- AI Chatbot -->
+<div id="chatbot" class="chatbot">
+
+    <div class="chat-header">
+        🤖 AI Library Assistant
+        <span onclick="closeChatbot()">×</span>
+    </div>
+
+    <div id="chatMessages" class="chat-messages">
+
+        <div class="bot-message">
+            Hello! 👋 I'm your AI Library Assistant.
+            How can I help you?
+        </div>
+
+    </div>
+
+    <div class="chat-input">
+
+        <input
+            type="text"
+            id="chatInput"
+            placeholder="Ask something..."
+        >
+
+        <button onclick="sendMessage()">
+            Send
+        </button>
+
+    </div>
+
+</div>
+
+
+<footer>
+    <p>
+        © 2026 AI Smart Library Management System
+    </p>
+</footer>
+
+
+<script src="js/script.js"></script>
+```
+
+</body>
+</html>
