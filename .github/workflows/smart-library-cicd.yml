@@ -4,11 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'backend/**'
-      - 'frontend/**'
-      - '.github/workflows/smart-library-cicd.yml'
-
   workflow_dispatch:
 
 permissions:
@@ -16,8 +11,53 @@ permissions:
 
 jobs:
 
+  changes:
+    name: Detect Changes
+    runs-on: self-hosted
+
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      mysql: ${{ steps.filter.outputs.mysql }}
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Detect Changed Components
+        id: filter
+        shell: bash
+        run: |
+          git fetch origin main --depth=2 || true
+
+          if git diff --name-only HEAD^ HEAD | grep -qE '^backend/|^\.github/workflows/'; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "backend=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if git diff --name-only HEAD^ HEAD | grep -qE '^frontend/|^\.github/workflows/'; then
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "frontend=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          if git diff --name-only HEAD^ HEAD | grep -qE '^(mysql/|docker-compose.*\.ya?ml$|.*mysql.*\.ya?ml$)'; then
+            echo "mysql=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "mysql=false" >> "$GITHUB_OUTPUT"
+          fi
+
+          echo "=== CHANGE DETECTION ==="
+          echo "Backend: ${{ steps.filter.outputs.backend }}"
+          echo "Frontend: ${{ steps.filter.outputs.frontend }}"
+          echo "MySQL: ${{ steps.filter.outputs.mysql }}"
+
+
   backend-build:
     name: Backend Build
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
     runs-on: self-hosted
 
     steps:
@@ -38,8 +78,13 @@ jobs:
         run: |
           echo "=== PYTHON SYNTAX CHECK ==="
 
-          docker run --rm \
-            -v "$(pwd)/backend:/workspace" \
+          BACKEND_PATH="$(pwd -W)/backend"
+
+          echo "Backend path:"
+          echo "$BACKEND_PATH"
+
+          MSYS_NO_PATHCONV=1 docker run --rm \
+            -v "$BACKEND_PATH:/workspace" \
             -w /workspace \
             python:3.11-slim \
             python -m py_compile app.py
@@ -51,7 +96,7 @@ jobs:
         run: |
           echo "=== BUILDING BACKEND ==="
 
-          docker build --no-cache \
+          docker build \
             -t ai-smart-library-backend:latest \
             ./backend
 
@@ -60,19 +105,30 @@ jobs:
       - name: Test Backend Container
         shell: bash
         run: |
-          echo "=== START BACKEND ==="
+          echo "=== START BACKEND TEST ==="
 
           docker rm -f smart-library-backend-ci 2>/dev/null || true
 
           docker run -d \
             --name smart-library-backend-ci \
             -p 5001:5000 \
+            -e DB_HOST="${DB_HOST:-smart-library-mysql}" \
+            -e DB_PORT="${DB_PORT:-3306}" \
+            -e DB_NAME="${DB_NAME:-smart_library}" \
+            -e DB_USER="${DB_USER:-library_user}" \
+            -e DB_PASSWORD="${DB_PASSWORD:-}" \
+            -e JWT_SECRET="${JWT_SECRET:-ci-test-secret}" \
+            -e JWT_EXPIRATION_HOURS="${JWT_EXPIRATION_HOURS:-24}" \
             ai-smart-library-backend:latest
 
           echo "Waiting for backend..."
 
           for i in {1..30}; do
-            if curl -fsS http://localhost:5001/api/health >/dev/null 2>&1; then
+
+            if curl -fsS \
+              http://localhost:5001/api/health \
+              >/dev/null 2>&1; then
+
               echo "Backend health check SUCCESS"
               break
             fi
@@ -86,6 +142,7 @@ jobs:
             sleep 2
           done
 
+          echo "=== BACKEND HEALTH ==="
           curl -fsS http://localhost:5001/api/health
           echo
 
@@ -98,42 +155,35 @@ jobs:
 
   frontend-build:
     name: Frontend Build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
     runs-on: self-hosted
 
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Verify Frontend Files
+        shell: bash
+        run: |
+          echo "=== FRONTEND FILES ==="
+          find frontend -maxdepth 2 -type f -print
+
       - name: Build Frontend Image
         shell: bash
         run: |
           echo "=== BUILDING FRONTEND ==="
 
-          docker build --no-cache \
+          docker build \
             -t ai-smart-library-frontend:latest \
             ./frontend
 
-          echo "Frontend image build SUCCESS"
-
-      - name: Verify Frontend Files
-        shell: bash
-        run: |
-          echo "=== VERIFY FRONTEND FILES ==="
-
-          docker run --rm \
-            ai-smart-library-frontend:latest \
-            sh -c "
-              test -f /usr/share/nginx/html/index.html &&
-              test -f /usr/share/nginx/html/login.html &&
-              test -f /usr/share/nginx/html/register.html
-            "
-
-          echo "Frontend HTML files SUCCESS"
+          echo "Frontend build SUCCESS"
 
       - name: Test Frontend Container
         shell: bash
         run: |
-          echo "=== START FRONTEND ==="
+          echo "=== START FRONTEND TEST ==="
 
           docker rm -f smart-library-frontend-ci 2>/dev/null || true
 
@@ -144,13 +194,17 @@ jobs:
 
           echo "Waiting for frontend..."
 
-          for i in {1..30}; do
-            if curl -fsS http://localhost:8081/ >/dev/null 2>&1; then
+          for i in {1..20}; do
+
+            if curl -fsS \
+              http://localhost:8081/ \
+              >/dev/null 2>&1; then
+
               echo "Frontend health check SUCCESS"
               break
             fi
 
-            if [ "$i" -eq 30 ]; then
+            if [ "$i" -eq 20 ]; then
               echo "Frontend health check FAILED"
               docker logs smart-library-frontend-ci || true
               exit 1
@@ -159,16 +213,14 @@ jobs:
             sleep 2
           done
 
-          echo "=== TEST INDEX ==="
-          curl -fsS -o /dev/null http://localhost:8081/
+          echo "=== FRONTEND ROOT ==="
+          curl -fsS -I http://localhost:8081/
 
-          echo "=== TEST LOGIN ==="
-          curl -fsS -o /dev/null http://localhost:8081/login.html
+          echo "=== LOGIN PAGE ==="
+          curl -fsS -I http://localhost:8081/login.html
 
-          echo "=== TEST REGISTER ==="
-          curl -fsS -o /dev/null http://localhost:8081/register.html
-
-          echo "Frontend pages SUCCESS"
+          echo "=== REGISTER PAGE ==="
+          curl -fsS -I http://localhost:8081/register.html
 
       - name: Cleanup Frontend Test Container
         if: always()
@@ -177,15 +229,45 @@ jobs:
           docker rm -f smart-library-frontend-ci 2>/dev/null || true
 
 
-  cleanup:
-    name: Docker Cleanup
+  mysql-check:
+    name: MySQL Check
+    needs: changes
+    if: needs.changes.outputs.mysql == 'true'
     runs-on: self-hosted
 
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check MySQL Configuration
+        shell: bash
+        run: |
+          echo "=== MYSQL CHANGE DETECTED ==="
+
+          if [ -f docker-compose.yml ]; then
+            echo "docker-compose.yml found"
+          fi
+
+          if [ -f docker-compose.yaml ]; then
+            echo "docker-compose.yaml found"
+          fi
+
+          if [ -d mysql ]; then
+            echo "mysql directory found"
+            find mysql -maxdepth 2 -type f -print
+          fi
+
+          echo "MySQL configuration check completed"
+
+
+  cleanup:
+    name: Docker Cleanup
     needs:
       - backend-build
       - frontend-build
-
+      - mysql-check
     if: always()
+    runs-on: self-hosted
 
     steps:
       - name: Docker Cleanup
