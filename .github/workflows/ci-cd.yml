@@ -1,185 +1,167 @@
 name: Smart Library CI/CD
 
 on:
-  push:
-    branches:
-      - main
+push:
+branches:
+- main
 
 permissions:
-  contents: read
+contents: read
 
 jobs:
 
-  backend-build:
-    name: Backend Build
-    runs-on: self-hosted
+backend-build:
+name: Backend Build
+runs-on: self-hosted
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+steps:
+  - name: Checkout code
+    uses: actions/checkout@v4
 
-      - name: Check Docker
-        shell: powershell
-        run: |
-          docker --version
-          docker info --format "Docker Server: {{.ServerVersion}}"
+  - name: Check Docker
+    shell: bash
+    run: |
+      echo "=== DOCKER VERSION ==="
+      docker --version
 
-      - name: Build Backend Image
-        shell: powershell
-        run: |
-          docker build -t ai-smart-library-backend:latest ./backend
+      echo "=== DOCKER SERVER ==="
+      docker info --format 'Docker Server: {{.ServerVersion}}'
 
-      - name: Remove Old Backend Container
-        shell: powershell
-        run: |
-          $container = docker ps -aq -f "name=^smart-library-backend$"
-          if ($container) {
-              docker rm -f smart-library-backend
-          }
-          exit 0
+      echo "=== DOCKER CONTEXT ==="
+      docker context show
 
-      - name: Start Backend Container
-        shell: powershell
-        run: |
-          docker run -d `
-            --name smart-library-backend `
-            -p 5000:5000 `
-            ai-smart-library-backend:latest
+  - name: Build Backend Image
+    shell: bash
+    run: |
+      echo "=== BUILDING BACKEND ==="
+      docker build --no-cache \
+        -t ai-smart-library-backend:latest \
+        ./backend
 
-      - name: Wait for Backend
-        shell: powershell
-        run: |
-          $maxAttempts = 30
+  - name: Remove Old Backend Container
+    shell: bash
+    run: |
+      echo "=== REMOVING OLD BACKEND ==="
+      docker rm -f smart-library-backend 2>/dev/null || true
 
-          for ($i = 1; $i -le $maxAttempts; $i++) {
-              try {
-                  $response = Invoke-WebRequest `
-                    -Uri "http://localhost:5000/health" `
-                    -UseBasicParsing `
-                    -TimeoutSec 5
+  - name: Start Backend Container
+    shell: bash
+    run: |
+      echo "=== STARTING BACKEND ==="
+      docker run -d \
+        --name smart-library-backend \
+        -p 5000:5000 \
+        ai-smart-library-backend:latest
 
-                  if ($response.StatusCode -eq 200) {
-                      Write-Host "Backend is healthy."
-                      exit 0
-                  }
-              }
-              catch {
-                  Write-Host "Backend not ready. Attempt $i/$maxAttempts"
-              }
+  - name: Wait For Backend
+    shell: bash
+    run: |
+      echo "Waiting for backend..."
+      sleep 5
 
-              Start-Sleep -Seconds 2
-          }
+  - name: Backend Health Check
+    shell: bash
+    run: |
+      echo "=== BACKEND HEALTH CHECK ==="
 
-          Write-Host "Backend failed health check."
-          docker ps -a
-          docker logs smart-library-backend
-          exit 1
+      response=$(curl -s -o /tmp/backend_response.txt \
+        -w "%{http_code}" \
+        http://localhost:5000/api/health)
 
-      - name: Backend Health Check
-        shell: powershell
-        run: |
-          $response = Invoke-WebRequest `
-            -Uri "http://localhost:5000/health" `
-            -UseBasicParsing
+      echo "HTTP Status: $response"
+      echo "Response:"
+      cat /tmp/backend_response.txt
 
-          Write-Host $response.Content
+      if [ "$response" != "200" ]; then
+        echo "Backend health check FAILED"
+        exit 1
+      fi
 
-      - name: Backend Container Status
-        if: always()
-        shell: powershell
-        run: |
-          docker ps -a
+      echo "Backend health check PASSED"
 
-      - name: Backend Logs On Failure
-        if: failure()
-        shell: powershell
-        run: |
-          docker logs smart-library-backend
+  - name: Backend Container Status
+    shell: bash
+    run: |
+      echo "=== BACKEND CONTAINER ==="
+      docker ps -a --filter "name=smart-library-backend"
+
+frontend-build:
+name: Frontend Build
+runs-on: self-hosted
+needs: backend-build
 
 
-  frontend-build:
-    name: Frontend Build
-    runs-on: self-hosted
-    needs: backend-build
+steps:
+  - name: Checkout code
+    uses: actions/checkout@v4
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+  - name: Check Docker
+    shell: bash
+    run: |
+      echo "=== DOCKER VERSION ==="
+      docker --version
 
-      - name: Check Docker
-        shell: powershell
-        run: |
-          docker --version
-          docker info --format "Docker Server: {{.ServerVersion}}"
+      echo "=== DOCKER SERVER ==="
+      docker info --format 'Docker Server: {{.ServerVersion}}'
 
-      - name: Build Frontend Image
-        shell: powershell
-        run: |
-          docker build -t ai-smart-library-frontend:latest ./frontend
+      echo "=== DOCKER CONTEXT ==="
+      docker context show
 
-      - name: Remove Old Frontend Container
-        shell: powershell
-        run: |
-          $container = docker ps -aq -f "name=^smart-library-frontend$"
-          if ($container) {
-              docker rm -f smart-library-frontend
-          }
-          exit 0
+  - name: Build Frontend Image
+    shell: bash
+    run: |
+      echo "=== BUILDING FRONTEND ==="
+      docker build --no-cache \
+        -t ai-smart-library-frontend:latest \
+        ./frontend
 
-      - name: Start Frontend Container
-        shell: powershell
-        run: |
-          docker run -d `
-            --name smart-library-frontend `
-            -p 8080:80 `
-            ai-smart-library-frontend:latest
+  - name: Remove Old Frontend Container
+    shell: bash
+    run: |
+      echo "=== REMOVING OLD FRONTEND ==="
+      docker rm -f smart-library-frontend 2>/dev/null || true
 
-      - name: Wait for Frontend
-        shell: powershell
-        run: |
-          $maxAttempts = 30
+  - name: Start Frontend Container
+    shell: bash
+    run: |
+      echo "=== STARTING FRONTEND ==="
+      docker run -d \
+        --name smart-library-frontend \
+        -p 8080:80 \
+        ai-smart-library-frontend:latest
 
-          for ($i = 1; $i -le $maxAttempts; $i++) {
-              try {
-                  $response = Invoke-WebRequest `
-                    -Uri "http://localhost:8080" `
-                    -UseBasicParsing `
-                    -TimeoutSec 5
+  - name: Wait For Frontend
+    shell: bash
+    run: |
+      echo "Waiting for frontend..."
+      sleep 5
 
-                  if ($response.StatusCode -eq 200) {
-                      Write-Host "Frontend is healthy."
-                      exit 0
-                  }
-              }
-              catch {
-                  Write-Host "Frontend not ready. Attempt $i/$maxAttempts"
-              }
+  - name: Frontend Health Check
+    shell: bash
+    run: |
+      echo "=== FRONTEND HEALTH CHECK ==="
 
-              Start-Sleep -Seconds 2
-          }
+      response=$(curl -s -o /tmp/frontend_response.txt \
+        -w "%{http_code}" \
+        http://localhost:8080)
 
-          Write-Host "Frontend failed health check."
-          docker ps -a
-          docker logs smart-library-frontend
-          exit 1
+      echo "HTTP Status: $response"
 
-      - name: Frontend Health Check
-        shell: powershell
-        run: |
-          $response = Invoke-WebRequest `
-            -Uri "http://localhost:8080" `
-            -UseBasicParsing
+      if [ "$response" != "200" ]; then
+        echo "Frontend health check FAILED"
+        exit 1
+      fi
 
-          Write-Host "Frontend HTTP Status: $($response.StatusCode)"
+      echo "Frontend health check PASSED"
 
-      - name: Frontend Container Status
-        if: always()
-        shell: powershell
-        run: |
-          docker ps -a
+  - name: Frontend Container Status
+    shell: bash
+    run: |
+      echo "=== FRONTEND CONTAINER ==="
+      docker ps -a --filter "name=smart-library-frontend"
 
-      - name: Frontend Logs On Failure
-        if: failure()
-        shell: powershell
-        run: |
-          docker logs smart-library-frontend
+  - name: Final Container Status
+    shell: bash
+    run: |
+      echo "=== ALL CONTAINERS ==="
+      docker ps
