@@ -1,4 +1,4 @@
-name: Frontend CI/CD
+name: Backend CI/CD
 
 on:
   push:
@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  frontend-build:
+  backend-build:
     runs-on: self-hosted
 
     steps:
@@ -29,60 +29,67 @@ jobs:
           docker info
 
       # --------------------------------
-      # Build Frontend Docker Image
+      # Build Backend Image
       # --------------------------------
-      - name: Build Frontend Image
+      - name: Build Backend Image
         shell: powershell
         run: |
           docker build `
-            -t ai-smart-library-frontend:latest `
-            ./frontend
+            -t ai-smart-library-backend:latest `
+            ./backend
 
       # --------------------------------
-      # Remove Existing Container
+      # Remove Old Backend Container
       # --------------------------------
-      - name: Remove Old Frontend Container
+      - name: Remove Old Backend Container
         shell: powershell
         run: |
-          docker rm -f smart-library-frontend 2>$null
-          Write-Host "Old frontend container removed if it existed."
+          docker rm -f smart-library-backend 2>$null
+          Write-Host "Old backend container removed if it existed."
 
       # --------------------------------
-      # Run Frontend Container
+      # Run Backend Container
       # --------------------------------
-      - name: Run Frontend Container
+      - name: Run Backend Container
         shell: powershell
         run: |
           docker run -d `
-            --name smart-library-frontend `
-            -p 8080:80 `
-            ai-smart-library-frontend:latest
+            --name smart-library-backend `
+            -p 5000:5000 `
+            ai-smart-library-backend:latest
 
       # --------------------------------
-      # Verify Container
+      # Verify Backend Container
       # --------------------------------
-      - name: Verify Frontend Container
+      - name: Verify Backend Container
         shell: powershell
         run: |
           docker ps
-          docker ps -f name=smart-library-frontend
+          docker ps -f name=smart-library-backend
 
       # --------------------------------
-      # Test Frontend
+      # Wait For Backend
       # --------------------------------
-      - name: Test Frontend
+      - name: Wait For Backend
         shell: powershell
         run: |
           Start-Sleep -Seconds 5
+
+      # --------------------------------
+      # Backend Health Check
+      # --------------------------------
+      - name: Backend Health Check
+        shell: powershell
+        run: |
           Invoke-WebRequest `
-            -Uri "http://localhost:8080" `
+            -Uri "http://localhost:5000/api/health" `
             -UseBasicParsing
 
       # --------------------------------
-      # Show Logs
+      # Backend Logs
       # --------------------------------
-      - name: Frontend Container Logs
+      - name: Backend Logs
         if: always()
         shell: powershell
         run: |
-          docker logs smart-library-frontend 2>$null
+          docker logs smart-library-backend 2>$null
