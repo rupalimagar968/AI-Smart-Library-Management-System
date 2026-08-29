@@ -369,7 +369,6 @@ TABLET RESPONSIVE
 
 @media (max-width: 900px) {
 
-```
 .feature-container {
     grid-template-columns: repeat(2, 1fr);
 }
@@ -381,7 +380,6 @@ TABLET RESPONSIVE
 .hero h1 {
     font-size: 40px;
 }
-```
 
 }
 
@@ -391,7 +389,6 @@ MOBILE RESPONSIVE
 
 @media (max-width: 600px) {
 
-```
 .navbar {
     padding: 0 20px;
 }
@@ -450,6 +447,5 @@ MOBILE RESPONSIVE
 .modal-content {
     width: 90%;
 }
-```
 
 }

@@ -20,7 +20,6 @@ document
 
 function login() {
 
-```
 const email =
     document.getElementById("email").value;
 
@@ -32,33 +31,27 @@ if (!email) {
 alert("Frontend login demo. Backend authentication will be added later.");
 
 closeLogin();
-```
 
 }
 
 function openChatbot() {
 
-```
 document
     .getElementById("chatbot")
     .style.display = "block";
-```
 
 }
 
 function closeChatbot() {
 
-```
 document
     .getElementById("chatbot")
     .style.display = "none";
-```
 
 }
 
 function sendMessage() {
 
-```
 const input =
     document.getElementById("chatInput");
 
@@ -101,6 +94,5 @@ input.value = "";
 
 chat.scrollTop =
     chat.scrollHeight;
-```
 
 }
