@@ -1,0 +1,99 @@
+name: MySQL Test
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  mysql-test:
+    name: MySQL Container Test
+    runs-on: self-hosted
+
+    env:
+      MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+      MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+      MYSQL_USER: ${{ secrets.MYSQL_USER }}
+      MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Docker Version
+        shell: bash
+        run: |
+          docker --version
+          docker info --format 'Docker Server: {{.ServerVersion}}'
+
+      - name: Create Docker Network
+        shell: bash
+        run: |
+          docker network inspect smart-library-network >/dev/null 2>&1 || \
+          docker network create smart-library-network
+
+      - name: Remove Old MySQL
+        shell: bash
+        run: |
+          docker rm -f smart-library-mysql 2>/dev/null || true
+
+      - name: Start MySQL
+        shell: bash
+        run: |
+          docker run -d \
+            --name smart-library-mysql \
+            --network smart-library-network \
+            -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+            -e MYSQL_DATABASE="$MYSQL_DATABASE" \
+            -e MYSQL_USER="$MYSQL_USER" \
+            -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+            mysql:8.0
+
+      - name: Wait For MySQL
+        shell: bash
+        run: |
+          echo "Waiting for MySQL..."
+
+          for i in {1..30}; do
+            if docker exec smart-library-mysql \
+              mysqladmin ping \
+              -h 127.0.0.1 \
+              -uroot \
+              -p"$MYSQL_ROOT_PASSWORD" \
+              --silent; then
+              echo "MySQL is ready."
+              exit 0
+            fi
+
+            echo "MySQL not ready yet..."
+            sleep 2
+          done
+
+          echo "MySQL failed to start."
+          docker logs smart-library-mysql
+          exit 1
+
+      - name: Verify Database
+        shell: bash
+        run: |
+          docker exec smart-library-mysql \
+            mysql \
+            -uroot \
+            -p"$MYSQL_ROOT_PASSWORD" \
+            -e "SHOW DATABASES;"
+
+      - name: Cleanup MySQL
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f smart-library-mysql 2>/dev/null || true
+          docker network rm smart-library-network 2>/dev/null || true
+
+      - name: Docker Cleanup
+        if: always()
+        shell: bash
+        run: |
+          docker container prune -f
+          docker image prune -f
+          docker builder prune -f
