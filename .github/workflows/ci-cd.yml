@@ -1,167 +1,140 @@
 name: Smart Library CI/CD
 
 on:
-push:
-branches:
-- main
+  push:
+    branches:
+      - main
 
 permissions:
-contents: read
+  contents: read
 
 jobs:
+  backend-build:
+    name: Backend Build
+    runs-on: self-hosted
 
-backend-build:
-name: Backend Build
-runs-on: self-hosted
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-steps:
-  - name: Checkout code
-    uses: actions/checkout@v4
+      - name: Check Docker
+        shell: bash
+        run: |
+          echo "=== DOCKER VERSION ==="
+          docker --version
+          echo "=== DOCKER SERVER ==="
+          docker info --format 'Docker Server: {{.ServerVersion}}'
+          echo "=== DOCKER CONTEXT ==="
+          docker context show
 
-  - name: Check Docker
-    shell: bash
-    run: |
-      echo "=== DOCKER VERSION ==="
-      docker --version
+      - name: Build Backend Image
+        shell: bash
+        run: |
+          echo "=== BUILDING BACKEND ==="
+          docker build --no-cache -t ai-smart-library-backend:latest ./backend
 
-      echo "=== DOCKER SERVER ==="
-      docker info --format 'Docker Server: {{.ServerVersion}}'
+      - name: Remove Old Backend Container
+        shell: bash
+        run: |
+          docker rm -f smart-library-backend 2>/dev/null || true
 
-      echo "=== DOCKER CONTEXT ==="
-      docker context show
+      - name: Start Backend Container
+        shell: bash
+        run: |
+          docker run -d \
+            --name smart-library-backend \
+            -p 5000:5000 \
+            ai-smart-library-backend:latest
 
-  - name: Build Backend Image
-    shell: bash
-    run: |
-      echo "=== BUILDING BACKEND ==="
-      docker build --no-cache \
-        -t ai-smart-library-backend:latest \
-        ./backend
+      - name: Wait For Backend
+        shell: bash
+        run: |
+          sleep 5
 
-  - name: Remove Old Backend Container
-    shell: bash
-    run: |
-      echo "=== REMOVING OLD BACKEND ==="
-      docker rm -f smart-library-backend 2>/dev/null || true
+      - name: Backend Health Check
+        shell: bash
+        run: |
+          echo "=== BACKEND HEALTH CHECK ==="
+          response=$(curl -s -o /tmp/backend_response.txt -w "%{http_code}" http://localhost:5000/api/health)
+          echo "HTTP Status: $response"
+          cat /tmp/backend_response.txt
 
-  - name: Start Backend Container
-    shell: bash
-    run: |
-      echo "=== STARTING BACKEND ==="
-      docker run -d \
-        --name smart-library-backend \
-        -p 5000:5000 \
-        ai-smart-library-backend:latest
+          if [ "$response" != "200" ]; then
+            echo "Backend health check FAILED"
+            exit 1
+          fi
 
-  - name: Wait For Backend
-    shell: bash
-    run: |
-      echo "Waiting for backend..."
-      sleep 5
+          echo "Backend health check PASSED"
 
-  - name: Backend Health Check
-    shell: bash
-    run: |
-      echo "=== BACKEND HEALTH CHECK ==="
+      - name: Backend Container Status
+        shell: bash
+        run: |
+          docker ps -a --filter "name=smart-library-backend"
 
-      response=$(curl -s -o /tmp/backend_response.txt \
-        -w "%{http_code}" \
-        http://localhost:5000/api/health)
+  frontend-build:
+    name: Frontend Build
+    runs-on: self-hosted
+    needs: backend-build
 
-      echo "HTTP Status: $response"
-      echo "Response:"
-      cat /tmp/backend_response.txt
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      if [ "$response" != "200" ]; then
-        echo "Backend health check FAILED"
-        exit 1
-      fi
+      - name: Check Docker
+        shell: bash
+        run: |
+          echo "=== DOCKER VERSION ==="
+          docker --version
+          echo "=== DOCKER SERVER ==="
+          docker info --format 'Docker Server: {{.ServerVersion}}'
+          echo "=== DOCKER CONTEXT ==="
+          docker context show
 
-      echo "Backend health check PASSED"
+      - name: Build Frontend Image
+        shell: bash
+        run: |
+          echo "=== BUILDING FRONTEND ==="
+          docker build --no-cache -t ai-smart-library-frontend:latest ./frontend
 
-  - name: Backend Container Status
-    shell: bash
-    run: |
-      echo "=== BACKEND CONTAINER ==="
-      docker ps -a --filter "name=smart-library-backend"
+      - name: Remove Old Frontend Container
+        shell: bash
+        run: |
+          docker rm -f smart-library-frontend 2>/dev/null || true
 
-frontend-build:
-name: Frontend Build
-runs-on: self-hosted
-needs: backend-build
+      - name: Start Frontend Container
+        shell: bash
+        run: |
+          docker run -d \
+            --name smart-library-frontend \
+            -p 8080:80 \
+            ai-smart-library-frontend:latest
 
+      - name: Wait For Frontend
+        shell: bash
+        run: |
+          sleep 5
 
-steps:
-  - name: Checkout code
-    uses: actions/checkout@v4
+      - name: Frontend Health Check
+        shell: bash
+        run: |
+          echo "=== FRONTEND HEALTH CHECK ==="
+          response=$(curl -s -o /tmp/frontend_response.txt -w "%{http_code}" http://localhost:8080)
+          echo "HTTP Status: $response"
 
-  - name: Check Docker
-    shell: bash
-    run: |
-      echo "=== DOCKER VERSION ==="
-      docker --version
+          if [ "$response" != "200" ]; then
+            echo "Frontend health check FAILED"
+            exit 1
+          fi
 
-      echo "=== DOCKER SERVER ==="
-      docker info --format 'Docker Server: {{.ServerVersion}}'
+          echo "Frontend health check PASSED"
 
-      echo "=== DOCKER CONTEXT ==="
-      docker context show
+      - name: Frontend Container Status
+        shell: bash
+        run: |
+          docker ps -a --filter "name=smart-library-frontend"
 
-  - name: Build Frontend Image
-    shell: bash
-    run: |
-      echo "=== BUILDING FRONTEND ==="
-      docker build --no-cache \
-        -t ai-smart-library-frontend:latest \
-        ./frontend
-
-  - name: Remove Old Frontend Container
-    shell: bash
-    run: |
-      echo "=== REMOVING OLD FRONTEND ==="
-      docker rm -f smart-library-frontend 2>/dev/null || true
-
-  - name: Start Frontend Container
-    shell: bash
-    run: |
-      echo "=== STARTING FRONTEND ==="
-      docker run -d \
-        --name smart-library-frontend \
-        -p 8080:80 \
-        ai-smart-library-frontend:latest
-
-  - name: Wait For Frontend
-    shell: bash
-    run: |
-      echo "Waiting for frontend..."
-      sleep 5
-
-  - name: Frontend Health Check
-    shell: bash
-    run: |
-      echo "=== FRONTEND HEALTH CHECK ==="
-
-      response=$(curl -s -o /tmp/frontend_response.txt \
-        -w "%{http_code}" \
-        http://localhost:8080)
-
-      echo "HTTP Status: $response"
-
-      if [ "$response" != "200" ]; then
-        echo "Frontend health check FAILED"
-        exit 1
-      fi
-
-      echo "Frontend health check PASSED"
-
-  - name: Frontend Container Status
-    shell: bash
-    run: |
-      echo "=== FRONTEND CONTAINER ==="
-      docker ps -a --filter "name=smart-library-frontend"
-
-  - name: Final Container Status
-    shell: bash
-    run: |
-      echo "=== ALL CONTAINERS ==="
-      docker ps
+      - name: Final Container Status
+        shell: bash
+        run: |
+          echo "=== ALL CONTAINERS ==="
+          docker ps
