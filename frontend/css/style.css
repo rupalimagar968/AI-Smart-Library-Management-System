@@ -1,0 +1,455 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  }
+
+body {
+font-family: Arial, sans-serif;
+background: #f5f7fb;
+color: #222;
+}
+
+/* ==============================
+NAVBAR
+============================== */
+
+.navbar {
+height: 70px;
+display: flex;
+justify-content: space-between;
+align-items: center;
+padding: 0 7%;
+background: #1e293b;
+color: white;
+}
+
+.logo {
+font-size: 22px;
+font-weight: bold;
+}
+
+.navbar nav {
+display: flex;
+align-items: center;
+gap: 25px;
+}
+
+.navbar a {
+color: white;
+text-decoration: none;
+transition: 0.3s;
+}
+
+.navbar a:hover {
+color: #93c5fd;
+}
+
+/* ==============================
+BUTTONS
+============================== */
+
+button {
+border: none;
+padding: 11px 20px;
+border-radius: 6px;
+cursor: pointer;
+background: #2563eb;
+color: white;
+font-size: 15px;
+transition: 0.3s;
+}
+
+button:hover {
+opacity: 0.85;
+transform: translateY(-1px);
+}
+
+/* ==============================
+HERO SECTION
+============================== */
+
+.hero {
+min-height: 500px;
+display: flex;
+justify-content: center;
+align-items: center;
+text-align: center;
+padding: 50px;
+background: linear-gradient(
+135deg,
+#dbeafe,
+#eff6ff
+);
+}
+
+.hero-content {
+max-width: 800px;
+}
+
+.hero h1 {
+font-size: 48px;
+margin-bottom: 20px;
+}
+
+.hero h1 span {
+color: #2563eb;
+}
+
+.hero p {
+font-size: 19px;
+line-height: 1.6;
+margin-bottom: 30px;
+color: #475569;
+}
+
+.hero-buttons {
+display: flex;
+justify-content: center;
+gap: 15px;
+}
+
+.ai-button {
+background: #7c3aed;
+}
+
+/* ==============================
+FEATURES SECTION
+============================== */
+
+.features {
+padding: 70px 7%;
+text-align: center;
+}
+
+.features h2,
+.books h2,
+.about h2 {
+font-size: 32px;
+margin-bottom: 40px;
+}
+
+.feature-container {
+display: grid;
+grid-template-columns: repeat(4, 1fr);
+gap: 25px;
+}
+
+.feature-card {
+background: white;
+padding: 30px 20px;
+border-radius: 12px;
+box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+transition: 0.3s;
+}
+
+.feature-card:hover {
+transform: translateY(-5px);
+}
+
+.icon {
+font-size: 40px;
+margin-bottom: 15px;
+}
+
+.feature-card h3 {
+margin-bottom: 10px;
+}
+
+.feature-card p {
+color: #64748b;
+line-height: 1.5;
+}
+
+/* ==============================
+BOOKS SECTION
+============================== */
+
+.books {
+padding: 70px 7%;
+text-align: center;
+background: #eef2ff;
+}
+
+.book-container {
+display: grid;
+grid-template-columns: repeat(3, 1fr);
+gap: 25px;
+}
+
+.book-card {
+background: white;
+padding: 30px;
+border-radius: 12px;
+box-shadow: 0 5px 20px rgba(0, 0, 0, 0.06);
+transition: 0.3s;
+}
+
+.book-card:hover {
+transform: translateY(-5px);
+}
+
+.book-card h3 {
+margin-bottom: 10px;
+}
+
+.book-card p {
+margin: 15px 0;
+color: #64748b;
+}
+
+.book-card span {
+color: #16a34a;
+font-weight: bold;
+}
+
+/* ==============================
+ABOUT SECTION
+============================== */
+
+.about {
+padding: 70px 15%;
+text-align: center;
+}
+
+.about p {
+font-size: 18px;
+line-height: 1.7;
+color: #475569;
+}
+
+/* ==============================
+LOGIN MODAL
+============================== */
+
+.modal {
+display: none;
+position: fixed;
+inset: 0;
+background: rgba(0, 0, 0, 0.6);
+justify-content: center;
+align-items: center;
+z-index: 1000;
+}
+
+.modal-content {
+width: 350px;
+background: white;
+padding: 35px;
+border-radius: 12px;
+text-align: center;
+}
+
+.modal-content h2 {
+margin-bottom: 20px;
+}
+
+.modal-content input {
+width: 100%;
+padding: 12px;
+margin: 10px 0;
+border: 1px solid #ddd;
+border-radius: 6px;
+outline: none;
+}
+
+.modal-content input:focus {
+border-color: #2563eb;
+}
+
+.modal-content button {
+width: 100%;
+margin-top: 10px;
+}
+
+.close {
+float: right;
+font-size: 25px;
+cursor: pointer;
+color: #555;
+}
+
+.close:hover {
+color: #000;
+}
+
+/* ==============================
+AI CHATBOT
+============================== */
+
+.chatbot {
+display: none;
+position: fixed;
+right: 25px;
+bottom: 25px;
+width: 350px;
+background: white;
+border-radius: 12px;
+box-shadow: 0 5px 30px rgba(0, 0, 0, 0.2);
+overflow: hidden;
+z-index: 2000;
+}
+
+.chat-header {
+background: #7c3aed;
+color: white;
+padding: 15px;
+display: flex;
+justify-content: space-between;
+align-items: center;
+}
+
+.chat-header span {
+cursor: pointer;
+font-size: 22px;
+}
+
+.chat-messages {
+height: 300px;
+padding: 15px;
+overflow-y: auto;
+}
+
+.bot-message,
+.user-message {
+padding: 10px;
+margin-bottom: 10px;
+border-radius: 8px;
+max-width: 85%;
+}
+
+.bot-message {
+background: #ede9fe;
+text-align: left;
+}
+
+.user-message {
+background: #dbeafe;
+text-align: right;
+margin-left: auto;
+}
+
+.chat-input {
+display: flex;
+padding: 10px;
+gap: 5px;
+border-top: 1px solid #eee;
+}
+
+.chat-input input {
+flex: 1;
+padding: 10px;
+border: 1px solid #ddd;
+border-radius: 6px;
+outline: none;
+}
+
+.chat-input input:focus {
+border-color: #7c3aed;
+}
+
+.chat-input button {
+padding: 10px 15px;
+}
+
+/* ==============================
+FOOTER
+============================== */
+
+footer {
+padding: 25px;
+text-align: center;
+background: #1e293b;
+color: white;
+}
+
+/* ==============================
+TABLET RESPONSIVE
+============================== */
+
+@media (max-width: 900px) {
+
+```
+.feature-container {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.book-container {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.hero h1 {
+    font-size: 40px;
+}
+```
+
+}
+
+/* ==============================
+MOBILE RESPONSIVE
+============================== */
+
+@media (max-width: 600px) {
+
+```
+.navbar {
+    padding: 0 20px;
+}
+
+.navbar nav {
+    gap: 10px;
+}
+
+.navbar nav a {
+    display: none;
+}
+
+.hero {
+    padding: 30px 20px;
+}
+
+.hero h1 {
+    font-size: 35px;
+}
+
+.hero p {
+    font-size: 16px;
+}
+
+.hero-buttons {
+    flex-direction: column;
+    align-items: center;
+}
+
+.hero-buttons button {
+    width: 200px;
+}
+
+.feature-container {
+    grid-template-columns: 1fr;
+}
+
+.book-container {
+    grid-template-columns: 1fr;
+}
+
+.about {
+    padding: 50px 25px;
+}
+
+.about p {
+    font-size: 16px;
+}
+
+.chatbot {
+    width: 90%;
+    right: 5%;
+    bottom: 15px;
+}
+
+.modal-content {
+    width: 90%;
+}
+```
+
+}

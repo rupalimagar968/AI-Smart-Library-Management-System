@@ -1,0 +1,49 @@
+name: Frontend CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "frontend/**"
+      - ".github/workflows/frontend.yml"
+
+jobs:
+  frontend-build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Check Docker
+        run: docker --version
+
+      - name: Build Frontend Docker Image
+        run: docker build -t ai-smart-library-frontend:latest ./frontend
+
+      - name: Stop Existing Container
+        shell: powershell
+        run: |
+          docker stop smart-library-frontend 2>$null
+          docker rm smart-library-frontend 2>$null
+
+      - name: Deploy Frontend Container
+        shell: powershell
+        run: |
+          docker run -d `
+            --name smart-library-frontend `
+            -p 8080:80 `
+            ai-smart-library-frontend:latest
+
+      - name: Verify Deployment
+        shell: powershell
+        run: |
+          docker ps
