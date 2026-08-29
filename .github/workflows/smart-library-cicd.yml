@@ -1,0 +1,181 @@
+name: Smart Library CI/CD
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+
+  backend-build:
+    name: Backend Build
+    runs-on: self-hosted
+
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Docker Information
+        shell: bash
+        run: |
+          echo "=== DOCKER VERSION ==="
+          docker version
+
+          echo "=== DOCKER CONTEXT ==="
+          docker context show
+
+      - name: Python Syntax Check
+        shell: bash
+        run: |
+          echo "=== PYTHON SYNTAX CHECK ==="
+          python -m py_compile backend/app.py
+          echo "Python syntax OK"
+
+      - name: Build Backend Image
+        shell: bash
+        run: |
+          echo "=== BUILDING BACKEND ==="
+
+          docker build \
+            -t ai-smart-library-backend:latest \
+            ./backend
+
+          echo "Backend image build SUCCESS"
+
+      - name: Test Backend Container
+        shell: bash
+        env:
+          DB_HOST: ${{ vars.DB_HOST }}
+          DB_PORT: ${{ vars.DB_PORT }}
+          DB_NAME: ${{ vars.MYSQL_DATABASE }}
+          DB_USER: ${{ secrets.MYSQL_USER }}
+          DB_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          JWT_EXPIRATION_HOURS: ${{ vars.JWT_EXPIRATION_HOURS }}
+        run: |
+          echo "=== START BACKEND TEST ==="
+
+          docker rm -f smart-library-backend-ci 2>/dev/null || true
+
+          docker run -d \
+            --name smart-library-backend-ci \
+            --network smart-library-network \
+            -p 5001:5000 \
+            -e DB_HOST="$DB_HOST" \
+            -e DB_PORT="$DB_PORT" \
+            -e DB_NAME="$DB_NAME" \
+            -e DB_USER="$DB_USER" \
+            -e DB_PASSWORD="$DB_PASSWORD" \
+            -e JWT_SECRET="$JWT_SECRET" \
+            -e JWT_EXPIRATION_HOURS="$JWT_EXPIRATION_HOURS" \
+            ai-smart-library-backend:latest
+
+          echo "Waiting for backend..."
+
+          for i in {1..30}; do
+
+            if curl -fsS http://localhost:5001/api/health >/dev/null 2>&1; then
+              echo "Backend health check SUCCESS"
+              break
+            fi
+
+            if [ "$i" -eq 30 ]; then
+              echo "Backend health check FAILED"
+              docker logs smart-library-backend-ci || true
+              exit 1
+            fi
+
+            sleep 2
+
+          done
+
+          echo "=== TEST DATABASE CONNECTION ==="
+
+          docker exec smart-library-backend-ci \
+            python -c "
+import mysql.connector
+import os
+
+conn = mysql.connector.connect(
+    host=os.environ['DB_HOST'],
+    port=int(os.environ['DB_PORT']),
+    database=os.environ['DB_NAME'],
+    user=os.environ['DB_USER'],
+    password=os.environ['DB_PASSWORD']
+)
+
+print('MYSQL CONNECTION SUCCESS')
+conn.close()
+"
+
+          echo "=== BACKEND TEST PASSED ==="
+
+      - name: Cleanup Backend Test Container
+        if: always()
+        shell: bash
+        run: |
+          docker rm -f smart-library-backend-ci 2>/dev/null || true
+
+
+  frontend-build:
+    name: Frontend Build
+    runs-on: self-hosted
+
+    steps:
+
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Frontend Image
+        shell: bash
+        run: |
+          echo "=== BUILDING FRONTEND ==="
+
+          docker build \
+            -t ai-smart-library-frontend:latest \
+            ./frontend
+
+          echo "Frontend build SUCCESS"
+
+
+  cleanup:
+    name: Docker Cleanup
+    runs-on: self-hosted
+
+    needs:
+      - backend-build
+      - frontend-build
+
+    if: always()
+
+    steps:
+
+      - name: Docker Cleanup
+        shell: bash
+        run: |
+
+          echo "=== DOCKER DISK USAGE BEFORE CLEANUP ==="
+          docker system df
+
+          echo "=== REMOVE STOPPED CONTAINERS ==="
+          docker container prune -f
+
+          echo "=== REMOVE UNUSED BUILD CACHE ==="
+          docker builder prune -af
+
+          echo "=== REMOVE UNUSED NETWORKS ==="
+          docker network prune -f
+
+          echo "=== REMOVE DANGLING IMAGES ==="
+          docker image prune -f
+
+          echo "=== DOCKER DISK USAGE AFTER CLEANUP ==="
+          docker system df
+
+          echo "=== RUNNING CONTAINERS ==="
+          docker ps
