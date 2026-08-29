@@ -4,38 +4,43 @@ on:
   push:
     branches:
       - main
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
-
   backend-build:
     name: Backend Build
     runs-on: self-hosted
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Docker Information
+      - name: Docker information
         shell: bash
         run: |
           echo "=== DOCKER VERSION ==="
           docker --version
           echo "=== DOCKER SERVER ==="
-          docker info --format 'Docker Server: {{.ServerVersion}}'
+          docker version --format 'Docker Server: {{.Server.Version}}'
           echo "=== DOCKER CONTEXT ==="
           docker context show
 
-      - name: Python Syntax Check
+      - name: Python syntax check
         shell: bash
         run: |
           echo "=== PYTHON SYNTAX CHECK ==="
-          python -m py_compile backend/app.py
-          echo "Python syntax OK"
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE/backend:/app" \
+            -w /app \
+            python:3.11-slim \
+            python -m py_compile app.py
 
-      - name: Build Backend Image
+      - name: Build backend image
         shell: bash
         run: |
           echo "=== BUILDING BACKEND ==="
@@ -43,37 +48,59 @@ jobs:
             -t ai-smart-library-backend:latest \
             ./backend
 
-      - name: Replace Backend Container
+      - name: Verify backend image
         shell: bash
         run: |
-          echo "=== STOPPING OLD BACKEND ==="
+          echo "=== BACKEND IMAGE ==="
+          docker image inspect ai-smart-library-backend:latest
+          docker images ai-smart-library-backend
+
+      - name: Replace backend container
+        shell: bash
+        run: |
+          echo "=== STARTING BACKEND ==="
+
           docker rm -f smart-library-backend 2>/dev/null || true
 
-          echo "=== STARTING BACKEND ==="
+          docker network create smart-library-network 2>/dev/null || true
+
           docker run -d \
             --name smart-library-backend \
+            --network smart-library-network \
             -p 5000:5000 \
             ai-smart-library-backend:latest
 
-      - name: Backend Health Check
+      - name: Wait for backend
         shell: bash
         run: |
-          echo "=== WAITING FOR BACKEND ==="
-          sleep 5
+          echo "Waiting for backend..."
 
-          echo "=== BACKEND HEALTH ==="
-          curl --fail http://localhost:5000/api/health
+          for i in {1..30}; do
+            if curl -fsS http://localhost:5000/api/health; then
+              echo
+              echo "Backend is healthy."
+              exit 0
+            fi
 
-      - name: Backend Logs
+            sleep 2
+          done
+
+          echo "Backend failed health check."
+          docker logs smart-library-backend
+          exit 1
+
+      - name: Backend logs
         if: always()
         shell: bash
         run: |
-          echo "=== BACKEND CONTAINER ==="
-          docker ps -a --filter "name=smart-library-backend"
+          docker logs smart-library-backend || true
 
-          echo "=== BACKEND LOGS ==="
-          docker logs smart-library-backend 2>&1 || true
-
+      - name: Cleanup unused build cache
+        if: success()
+        shell: bash
+        run: |
+          echo "=== CLEANING UNUSED BUILD CACHE ==="
+          docker builder prune -f
 
   frontend-build:
     name: Frontend Build
@@ -81,86 +108,85 @@ jobs:
     needs: backend-build
 
     steps:
-      - name: Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Docker Information
+      - name: Docker information
         shell: bash
         run: |
           echo "=== DOCKER VERSION ==="
           docker --version
           echo "=== DOCKER SERVER ==="
-          docker info --format 'Docker Server: {{.ServerVersion}}'
+          docker version --format 'Docker Server: {{.Server.Version}}'
           echo "=== DOCKER CONTEXT ==="
           docker context show
 
-      - name: Build Frontend Image
+      - name: Build frontend image
         shell: bash
         run: |
           echo "=== BUILDING FRONTEND ==="
+
           docker build --no-cache \
             -t ai-smart-library-frontend:latest \
             ./frontend
 
-      - name: Replace Frontend Container
+      - name: Verify frontend image
         shell: bash
         run: |
-          echo "=== STOPPING OLD FRONTEND ==="
+          echo "=== FRONTEND IMAGE ==="
+          docker image inspect ai-smart-library-frontend:latest
+          docker images ai-smart-library-frontend
+
+      - name: Replace frontend container
+        shell: bash
+        run: |
+          echo "=== STARTING FRONTEND ==="
+
           docker rm -f smart-library-frontend 2>/dev/null || true
 
-          echo "=== STARTING FRONTEND ==="
           docker run -d \
             --name smart-library-frontend \
+            --network smart-library-network \
             -p 8080:80 \
             ai-smart-library-frontend:latest
 
-      - name: Frontend Health Check
+      - name: Test frontend
         shell: bash
         run: |
-          echo "=== WAITING FOR FRONTEND ==="
-          sleep 5
+          echo "Waiting for frontend..."
 
-          echo "=== FRONTEND HEALTH ==="
-          curl --fail http://localhost:8080/
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8080/ > /dev/null; then
+              echo "Frontend is healthy."
+              exit 0
+            fi
 
-      - name: Frontend Logs
+            sleep 2
+          done
+
+          echo "Frontend failed health check."
+          docker logs smart-library-frontend
+          exit 1
+
+      - name: Frontend logs
         if: always()
         shell: bash
         run: |
-          echo "=== FRONTEND CONTAINER ==="
-          docker ps -a --filter "name=smart-library-frontend"
+          docker logs smart-library-frontend || true
 
-          echo "=== FRONTEND LOGS ==="
-          docker logs smart-library-frontend 2>&1 || true
-
-
-  cleanup:
-    name: Docker Cleanup
-    runs-on: self-hosted
-    needs:
-      - backend-build
-      - frontend-build
-    if: success()
-
-    steps:
-      - name: Cleanup unused Docker resources
+      - name: Docker status
+        if: always()
         shell: bash
         run: |
-          echo "=== BEFORE CLEANUP ==="
-          docker system df
-
-          echo "=== REMOVE UNUSED BUILD CACHE ==="
-          docker builder prune -af
-
-          echo "=== REMOVE UNUSED IMAGES ==="
-          docker image prune -f
-
-          echo "=== AFTER CLEANUP ==="
-          docker system df
-
-          echo "=== VERIFY MYSQL IS UNTOUCHED ==="
-          docker images mysql:8.0
-          docker ps -a --filter "ancestor=mysql:8.0" || true
-
           echo "=== RUNNING CONTAINERS ==="
           docker ps
+
+          echo "=== DISK USAGE ==="
+          docker system df
+
+      - name: Cleanup unused build cache
+        if: success()
+        shell: bash
+        run: |
+          echo "=== CLEANING UNUSED BUILD CACHE ==="
+          docker builder prune -f
