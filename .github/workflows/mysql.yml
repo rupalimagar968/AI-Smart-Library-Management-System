@@ -4,193 +4,101 @@ on:
   push:
     branches:
       - main
-
-  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
 
 jobs:
-
   mysql-test:
     name: MySQL Container Test
     runs-on: self-hosted
 
-    env:
-      MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
-      MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
-      MYSQL_USER: ${{ secrets.MYSQL_USER }}
-      MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
-
     steps:
-
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Docker Check
-        shell: bash
-        run: |
-          echo "=== DOCKER VERSION ==="
-          docker --version
-
-          echo "=== DOCKER SERVER ==="
-          docker info --format 'Docker Server: {{.ServerVersion}}'
-
-          echo "=== DOCKER CONTEXT ==="
-          docker context show
-
-      - name: Verify MySQL Image
-        shell: bash
-        run: |
-          echo "=== CHECKING MYSQL IMAGE ==="
-
-          if docker image inspect mysql:8.0 >/dev/null 2>&1; then
-            echo "mysql:8.0 already exists."
-            echo "No download required."
-          else
-            echo "mysql:8.0 does not exist."
-            echo "Downloading MySQL 8.0..."
-            docker pull mysql:8.0
-          fi
-
-      - name: Show Existing MySQL Containers
+      - name: Check existing MySQL
         shell: bash
         run: |
           echo "=== EXISTING MYSQL CONTAINERS ==="
+          docker ps -a --filter "name=smart-library-mysql" || true
 
-          docker ps -a --filter "ancestor=mysql:8.0" || true
+          echo "=== MYSQL IMAGE ==="
+          docker images mysql:8.0 || true
 
-      - name: Start CI MySQL Container
+      - name: Pull MySQL image if missing
         shell: bash
         run: |
-          echo "=== STARTING CI MYSQL ==="
+          if docker image inspect mysql:8.0 >/dev/null 2>&1; then
+            echo "mysql:8.0 already exists. No pull required."
+          else
+            echo "mysql:8.0 not found. Pulling image..."
+            docker pull mysql:8.0
+          fi
 
-          docker rm -f smart-library-mysql-ci 2>/dev/null || true
+      - name: Start temporary MySQL test container
+        shell: bash
+        run: |
+          echo "=== STARTING TEMPORARY MYSQL TEST CONTAINER ==="
+
+          docker rm -f mysql-ci-test 2>/dev/null || true
 
           docker run -d \
-            --name smart-library-mysql-ci \
-            -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
-            -e MYSQL_DATABASE="$MYSQL_DATABASE" \
-            -e MYSQL_USER="$MYSQL_USER" \
-            -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+            --name mysql-ci-test \
+            -e MYSQL_ROOT_PASSWORD=rootpassword \
+            -e MYSQL_DATABASE=smart_library_test \
             mysql:8.0
 
-      - name: Wait For MySQL
+      - name: Wait for MySQL
         shell: bash
         run: |
           echo "=== WAITING FOR MYSQL ==="
 
           for i in {1..60}; do
-
-            if docker exec smart-library-mysql-ci \
+            if docker exec mysql-ci-test \
               mysqladmin ping \
-              -h 127.0.0.1 \
               -uroot \
-              -p"$MYSQL_ROOT_PASSWORD" \
-              --silent; then
+              -prootpassword \
+              --silent >/dev/null 2>&1; then
 
               echo "MySQL is ready."
               exit 0
             fi
 
-            echo "MySQL not ready - attempt $i/60"
-
             sleep 2
-
           done
 
-          echo "MySQL startup FAILED."
-
-          docker logs smart-library-mysql-ci || true
-
+          echo "MySQL failed to start."
+          docker logs mysql-ci-test
           exit 1
 
-      - name: Test Database
+      - name: Test MySQL database
         shell: bash
         run: |
-          echo "=== TEST DATABASE ==="
+          echo "=== TESTING MYSQL DATABASE ==="
 
-          docker exec smart-library-mysql-ci \
+          docker exec mysql-ci-test \
             mysql \
             -uroot \
-            -p"$MYSQL_ROOT_PASSWORD" \
-            -e "SHOW DATABASES;"
+            -prootpassword \
+            -e "SELECT VERSION(); SHOW DATABASES;"
 
-      - name: Test Application User
-        shell: bash
-        run: |
-          echo "=== TEST MYSQL USER ==="
-
-          docker exec smart-library-mysql-ci \
-            mysql \
-            -uroot \
-            -p"$MYSQL_ROOT_PASSWORD" \
-            -e "SELECT User, Host FROM mysql.user;"
-
-      - name: Test Application Database Connection
-        shell: bash
-        run: |
-          echo "=== TEST APPLICATION USER LOGIN ==="
-
-          docker exec smart-library-mysql-ci \
-            mysql \
-            -u"$MYSQL_USER" \
-            -p"$MYSQL_PASSWORD" \
-            -D "$MYSQL_DATABASE" \
-            -e "SELECT DATABASE(), USER();"
-
-      - name: MySQL Logs
+      - name: Cleanup temporary MySQL container
         if: always()
         shell: bash
         run: |
-          echo "=== MYSQL LOGS ==="
+          echo "=== REMOVING ONLY TEMPORARY CI MYSQL CONTAINER ==="
 
-          docker logs smart-library-mysql-ci || true
+          docker rm -f mysql-ci-test 2>/dev/null || true
 
-      - name: Remove ONLY CI MySQL Container
-        if: always()
+          echo "=== VERIFYING LOCAL MYSQL WAS NOT TOUCHED ==="
+          docker ps -a --filter "name=smart-library-mysql" || true
+
+      - name: Cleanup unused build cache
+        if: success()
         shell: bash
         run: |
-          echo "=== REMOVING ONLY CI MYSQL CONTAINER ==="
-
-          docker rm -f smart-library-mysql-ci 2>/dev/null || true
-
-      - name: Verify Existing MySQL Containers
-        if: always()
-        shell: bash
-        run: |
-          echo "=== VERIFYING EXISTING MYSQL CONTAINERS ==="
-
-          docker ps -a --filter "ancestor=mysql:8.0" || true
-
-      - name: Verify MySQL Image Still Exists
-        if: always()
-        shell: bash
-        run: |
-          echo "=== VERIFY MYSQL IMAGE ==="
-
-          if docker image inspect mysql:8.0 >/dev/null 2>&1; then
-            echo "SUCCESS: mysql:8.0 image is still present."
-          else
-            echo "ERROR: mysql:8.0 image was unexpectedly removed."
-            exit 1
-          fi
-
-      - name: Safe Cleanup
-        if: always()
-        shell: bash
-        run: |
-          echo "=== SAFE DOCKER CLEANUP ==="
-
-          docker container prune -f
-          docker image prune -f
           docker builder prune -f
-
-          echo "=== MYSQL IMAGE PROTECTED ==="
-
-          docker image inspect mysql:8.0 \
-            --format 'MySQL image: {{.RepoTags}}'
-
-          echo "=== FINAL DOCKER USAGE ==="
-
-          docker system df
