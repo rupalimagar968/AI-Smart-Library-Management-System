@@ -16,7 +16,7 @@ JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
 
 def get_db_connection():
     return mysql.connector.connect(
-        host=os.getenv("DB_HOST", "localhost"),
+        host=os.getenv("DB_HOST", "smart-library-mysql"),
         port=int(os.getenv("DB_PORT", "3306")),
         database=os.getenv("DB_NAME", "smart_library"),
         user=os.getenv("DB_USER", "library_user"),
@@ -52,14 +52,13 @@ def api_health():
 def register():
     data = request.get_json(silent=True) or {}
 
-    name = data.get("name", "").strip()
-    email = data.get("email", "").strip().lower()
+    username = data.get("username", "").strip()
     password = data.get("password", "")
 
-    if not name or not email or not password:
+    if not username or not password:
         return jsonify({
             "success": False,
-            "message": "Name, email and password are required"
+            "message": "Username and password are required"
         }), 400
 
     if len(password) < 6:
@@ -76,8 +75,8 @@ def register():
         cursor = connection.cursor(dictionary=True)
 
         cursor.execute(
-            "SELECT id FROM users WHERE email = %s",
-            (email,)
+            "SELECT id FROM users WHERE username = %s",
+            (username,)
         )
 
         existing_user = cursor.fetchone()
@@ -85,17 +84,17 @@ def register():
         if existing_user:
             return jsonify({
                 "success": False,
-                "message": "Email already registered"
+                "message": "Username already registered"
             }), 409
 
         password_hash = generate_password_hash(password)
 
         cursor.execute(
             """
-            INSERT INTO users (name, email, password_hash)
-            VALUES (%s, %s, %s)
+            INSERT INTO users (username, password_hash)
+            VALUES (%s, %s)
             """,
-            (name, email, password_hash)
+            (username, password_hash)
         )
 
         connection.commit()
@@ -124,13 +123,13 @@ def register():
 def login():
     data = request.get_json(silent=True) or {}
 
-    email = data.get("email", "").strip().lower()
+    username = data.get("username", "").strip()
     password = data.get("password", "")
 
-    if not email or not password:
+    if not username or not password:
         return jsonify({
             "success": False,
-            "message": "Email and password are required"
+            "message": "Username and password are required"
         }), 400
 
     connection = None
@@ -142,11 +141,11 @@ def login():
 
         cursor.execute(
             """
-            SELECT id, name, email, password_hash
+            SELECT id, username, password_hash
             FROM users
-            WHERE email = %s
+            WHERE username = %s
             """,
-            (email,)
+            (username,)
         )
 
         user = cursor.fetchone()
@@ -154,18 +153,21 @@ def login():
         if not user:
             return jsonify({
                 "success": False,
-                "message": "Invalid email or password"
+                "message": "Invalid username or password"
             }), 401
 
-        if not check_password_hash(user["password_hash"], password):
+        if not check_password_hash(
+            user["password_hash"],
+            password
+        ):
             return jsonify({
                 "success": False,
-                "message": "Invalid email or password"
+                "message": "Invalid username or password"
             }), 401
 
         payload = {
             "user_id": user["id"],
-            "email": user["email"],
+            "username": user["username"],
             "exp": datetime.now(timezone.utc)
             + timedelta(hours=JWT_EXPIRATION_HOURS)
         }
@@ -180,11 +182,7 @@ def login():
             "success": True,
             "message": "Login successful",
             "token": token,
-            "user": {
-                "id": user["id"],
-                "name": user["name"],
-                "email": user["email"]
-            }
+            "username": user["username"]
         })
 
     except mysql.connector.Error as error:
