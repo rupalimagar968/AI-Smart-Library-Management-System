@@ -4,9 +4,7 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,88 +15,184 @@ jobs:
     runs-on: self-hosted
 
     steps:
-      - name: Checkout code
+      - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Check existing MySQL
+      - name: Docker Information
         shell: bash
         run: |
-          echo "=== EXISTING MYSQL CONTAINERS ==="
-          docker ps -a --filter "name=smart-library-mysql" || true
+          echo "=== DOCKER VERSION ==="
+          docker version
+          echo "=== DOCKER CONTEXT ==="
+          docker context show
 
+      - name: Pull MySQL Image
+        shell: bash
+        run: |
           echo "=== MYSQL IMAGE ==="
-          docker images mysql:8.0 || true
 
-      - name: Pull MySQL image if missing
-        shell: bash
-        run: |
           if docker image inspect mysql:8.0 >/dev/null 2>&1; then
-            echo "mysql:8.0 already exists. No pull required."
+            echo "mysql:8.0 already exists."
+            echo "Existing MySQL image will NOT be removed."
           else
-            echo "mysql:8.0 not found. Pulling image..."
             docker pull mysql:8.0
           fi
 
-      - name: Start temporary MySQL test container
+      - name: Remove Old CI Container
         shell: bash
         run: |
-          echo "=== STARTING TEMPORARY MYSQL TEST CONTAINER ==="
+          echo "=== REMOVE OLD CI CONTAINER ==="
 
-          docker rm -f mysql-ci-test 2>/dev/null || true
+          docker rm -f smart-library-mysql-ci 2>/dev/null || true
+
+          echo "Only CI container targeted."
+          echo "Local smart-library-mysql is NOT touched."
+
+      - name: Start Fresh MySQL Container
+        shell: bash
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
+        run: |
+          echo "=== START MYSQL ==="
 
           docker run -d \
-            --name mysql-ci-test \
-            -e MYSQL_ROOT_PASSWORD=rootpassword \
-            -e MYSQL_DATABASE=smart_library_test \
+            --name smart-library-mysql-ci \
+            -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+            -e MYSQL_DATABASE="$MYSQL_DATABASE" \
+            -e MYSQL_USER="$MYSQL_USER" \
+            -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
             mysql:8.0
 
-      - name: Wait for MySQL
+          echo "Temporary MySQL container started."
+
+      - name: Wait For MySQL
         shell: bash
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
         run: |
           echo "=== WAITING FOR MYSQL ==="
 
           for i in {1..60}; do
-            if docker exec mysql-ci-test \
+
+            if docker exec smart-library-mysql-ci \
               mysqladmin ping \
+              --protocol=TCP \
+              -h 127.0.0.1 \
               -uroot \
-              -prootpassword \
+              -p"$MYSQL_ROOT_PASSWORD" \
               --silent >/dev/null 2>&1; then
 
               echo "MySQL is ready."
-              exit 0
+              break
             fi
 
+            if [ "$i" -eq 60 ]; then
+              echo "MySQL failed to start."
+              docker logs smart-library-mysql-ci || true
+              exit 1
+            fi
+
+            echo "Waiting for MySQL... $i/60"
             sleep 2
           done
 
-          echo "MySQL failed to start."
-          docker logs mysql-ci-test
-          exit 1
-
-      - name: Test MySQL database
+      - name: Test MySQL Database
         shell: bash
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
         run: |
           echo "=== TESTING MYSQL DATABASE ==="
 
-          docker exec mysql-ci-test \
+          docker exec \
+            -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+            smart-library-mysql-ci \
             mysql \
+            --protocol=TCP \
+            -h 127.0.0.1 \
             -uroot \
-            -prootpassword \
+            -p"$MYSQL_ROOT_PASSWORD" \
             -e "SELECT VERSION(); SHOW DATABASES;"
 
-      - name: Cleanup temporary MySQL container
+          echo "MYSQL CONNECTION SUCCESS"
+
+      - name: Verify Smart Library Database
+        shell: bash
+        env:
+          MYSQL_ROOT_PASSWORD: ${{ secrets.MYSQL_ROOT_PASSWORD }}
+          MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
+        run: |
+          echo "=== VERIFY DATABASE ==="
+
+          docker exec \
+            -e MYSQL_ROOT_PASSWORD="$MYSQL_ROOT_PASSWORD" \
+            smart-library-mysql-ci \
+            mysql \
+            --protocol=TCP \
+            -h 127.0.0.1 \
+            -uroot \
+            -p"$MYSQL_ROOT_PASSWORD" \
+            -e "USE \`$MYSQL_DATABASE\`; SELECT DATABASE();"
+
+          echo "DATABASE VERIFICATION SUCCESS"
+
+      - name: Test Application User
+        shell: bash
+        env:
+          MYSQL_USER: ${{ secrets.MYSQL_USER }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ vars.MYSQL_DATABASE }}
+        run: |
+          echo "=== TEST APPLICATION USER ==="
+
+          docker exec \
+            -e MYSQL_USER="$MYSQL_USER" \
+            -e MYSQL_PASSWORD="$MYSQL_PASSWORD" \
+            -e MYSQL_DATABASE="$MYSQL_DATABASE" \
+            smart-library-mysql-ci \
+            mysql \
+            --protocol=TCP \
+            -h 127.0.0.1 \
+            -u"$MYSQL_USER" \
+            -p"$MYSQL_PASSWORD" \
+            -e "USE \`$MYSQL_DATABASE\`; SELECT CURRENT_USER(); SELECT DATABASE();"
+
+          echo "APPLICATION USER CONNECTION SUCCESS"
+
+      - name: Cleanup Temporary MySQL
         if: always()
         shell: bash
         run: |
-          echo "=== REMOVING ONLY TEMPORARY CI MYSQL CONTAINER ==="
+          echo "=== CLEANUP TEMPORARY MYSQL ==="
 
-          docker rm -f mysql-ci-test 2>/dev/null || true
+          docker rm -f smart-library-mysql-ci 2>/dev/null || true
 
-          echo "=== VERIFYING LOCAL MYSQL WAS NOT TOUCHED ==="
-          docker ps -a --filter "name=smart-library-mysql" || true
+          echo "Temporary CI MySQL container removed."
+          echo "Local smart-library-mysql was NOT touched."
 
-      - name: Cleanup unused build cache
-        if: success()
+      - name: Verify Local MySQL
+        if: always()
         shell: bash
         run: |
-          docker builder prune -f
+          echo "=== VERIFY LOCAL MYSQL ==="
+
+          docker ps \
+            --filter "name=smart-library-mysql" \
+            --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
+
+      - name: Cleanup Docker Build Cache
+        if: always()
+        shell: bash
+        run: |
+          echo "=== CLEAN UNUSED BUILD CACHE ==="
+
+          docker builder prune -af
+
+          echo "=== FINAL DOCKER USAGE ==="
+          docker system df
+
+          echo "=== RUNNING CONTAINERS ==="
+          docker ps
