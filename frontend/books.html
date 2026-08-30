@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Digital Library - Books</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header class="topbar">
+    <div class="logo">📚 Smart Digital Library</div>
+
+    <nav>
+        <a href="index.html">Home</a>
+        <a href="books.html" class="active">Books</a>
+        <a href="login.html">Login</a>
+    </nav>
+</header>
+
+<main class="books-container">
+
+    <section class="books-header">
+        <div>
+            <h1>Library Books</h1>
+            <p>Browse and search available books.</p>
+        </div>
+
+        <button onclick="loadBooks()">🔄 Refresh</button>
+    </section>
+
+    <section class="book-filters">
+
+        <input
+            type="text"
+            id="searchInput"
+            placeholder="Search by title, author or ISBN..."
+        >
+
+        <select id="categoryFilter">
+            <option value="">All Categories</option>
+            <option value="Computer Science">Computer Science</option>
+        </select>
+
+        <select id="languageFilter">
+            <option value="">All Languages</option>
+            <option value="English">English</option>
+        </select>
+
+        <button onclick="applyFilters()">Search</button>
+        <button onclick="clearFilters()">Clear</button>
+
+    </section>
+
+    <div id="message"></div>
+
+    <section>
+        <div class="books-count">
+            <span id="booksCount">Loading books...</span>
+        </div>
+
+        <div id="booksGrid" class="books-grid"></div>
+    </section>
+
+</main>
+
+<script>
+
+const API_URL = "";
+
+async function loadBooks() {
+
+    const grid = document.getElementById("booksGrid");
+    const message = document.getElementById("message");
+
+    grid.innerHTML = "<p>Loading books...</p>";
+    message.textContent = "";
+
+    try {
+
+        const response = await fetch(`${API_URL}/api/books`);
+
+        if (!response.ok) {
+            throw new Error("Unable to load books");
+        }
+
+        const data = await response.json();
+
+        displayBooks(data.books || []);
+
+    } catch (error) {
+
+        console.error(error);
+
+        grid.innerHTML = "";
+        message.textContent =
+            "Unable to connect to the backend. Please make sure the backend is running.";
+
+        message.className = "error-message";
+    }
+}
+
+
+async function applyFilters() {
+
+    const search = document
+        .getElementById("searchInput")
+        .value
+        .trim();
+
+    const category = document
+        .getElementById("categoryFilter")
+        .value;
+
+    const language = document
+        .getElementById("languageFilter")
+        .value;
+
+    const params = new URLSearchParams();
+
+    if (search) {
+        params.append("q", search);
+    }
+
+    if (category) {
+        params.append("category", category);
+    }
+
+    if (language) {
+        params.append("language", language);
+    }
+
+    const grid = document.getElementById("booksGrid");
+
+    grid.innerHTML = "<p>Searching books...</p>";
+
+    try {
+
+        const url = params.toString()
+            ? `${API_URL}/api/books?${params.toString()}`
+            : `${API_URL}/api/books`;
+
+        const response = await fetch(url);
+
+        if (!response.ok) {
+            throw new Error("Search failed");
+        }
+
+        const data = await response.json();
+
+        displayBooks(data.books || []);
+
+    } catch (error) {
+
+        console.error(error);
+
+        grid.innerHTML =
+            "<p class='error-message'>Unable to search books.</p>";
+    }
+}
+
+
+function displayBooks(books) {
+
+    const grid = document.getElementById("booksGrid");
+    const count = document.getElementById("booksCount");
+
+    grid.innerHTML = "";
+
+    count.textContent =
+        `${books.length} book${books.length === 1 ? "" : "s"} found`;
+
+    if (books.length === 0) {
+
+        grid.innerHTML = `
+            <div class="no-books">
+                <h3>📚 No books found</h3>
+                <p>Try another search or filter.</p>
+            </div>
+        `;
+
+        return;
+    }
+
+    books.forEach(book => {
+
+        const card = document.createElement("div");
+
+        card.className = "book-card";
+
+        card.innerHTML = `
+            <div class="book-icon">📖</div>
+
+            <div class="book-content">
+
+                <h2>${escapeHtml(book.title)}</h2>
+
+                <p>
+                    <strong>Author:</strong>
+                    ${escapeHtml(book.author)}
+                </p>
+
+                <p>
+                    <strong>Category:</strong>
+                    ${escapeHtml(book.category || "N/A")}
+                </p>
+
+                <p>
+                    <strong>Language:</strong>
+                    ${escapeHtml(book.language || "English")}
+                </p>
+
+                <p>
+                    <strong>ISBN:</strong>
+                    ${escapeHtml(book.isbn || "N/A")}
+                </p>
+
+                <div class="book-stock">
+
+                    <span>
+                        Total: ${book.quantity}
+                    </span>
+
+                    <span class="${
+                        book.available_quantity > 0
+                            ? "available"
+                            : "unavailable"
+                    }">
+                        Available: ${book.available_quantity}
+                    </span>
+
+                </div>
+
+                <p class="book-description">
+                    ${escapeHtml(
+                        book.description || "No description available."
+                    )}
+                </p>
+
+            </div>
+        `;
+
+        grid.appendChild(card);
+    });
+}
+
+
+function clearFilters() {
+
+    document.getElementById("searchInput").value = "";
+    document.getElementById("categoryFilter").value = "";
+    document.getElementById("languageFilter").value = "";
+
+    loadBooks();
+}
+
+
+function escapeHtml(value) {
+
+    const div = document.createElement("div");
+
+    div.textContent = value ?? "";
+
+    return div.innerHTML;
+}
+
+
+document
+    .getElementById("searchInput")
+    .addEventListener("keypress", function(event) {
+
+        if (event.key === "Enter") {
+            applyFilters();
+        }
+
+    });
+
+
+loadBooks();
+
+</script>
+
+</body>
+</html>

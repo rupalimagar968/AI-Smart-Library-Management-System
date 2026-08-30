@@ -1,99 +1,315 @@
 <!DOCTYPE html>
-
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<title>AI Smart Library</title>
+    <title>AI Smart Library</title>
 
-<link rel="stylesheet" href="css/style.css">
+    <meta name="description"
+          content="AI Smart Library - Discover, search and manage books with an intelligent digital library system.">
 
+    <link rel="stylesheet" href="style.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap"
+          rel="stylesheet">
 </head>
 
 <body>
 
-<!-- Navigation -->
-<header class="navbar">
-    <div class="logo">
-        📚 AI Smart Library
-    </div>
+<!-- ================= NAVBAR ================= -->
 
-    <nav>
-        <a href="#home">Home</a>
-        <a href="#books">Books</a>
-        <a href="#about">About</a>
-        <button onclick="openLogin()">Login</button>
-    </nav>
+<header class="navbar">
+    <div class="nav-container">
+
+        <a href="#" class="logo">
+            <span class="logo-icon">📚</span>
+            <span>
+                <strong>AI Smart</strong>
+                <small>Library</small>
+            </span>
+        </a>
+
+        <nav class="nav-links">
+            <a href="#home" class="active">Home</a>
+            <a href="books.html">Books</a>
+            <a href="#features">Features</a>
+            <a href="#ai">AI Assistant</a>
+            <a href="#about">About</a>
+        </nav>
+
+        <div class="nav-actions">
+            <div class="nav-search">
+                <input
+                    type="text"
+                    id="navSearch"
+                    placeholder="Search books..."
+                >
+                <span>⌕</span>
+            </div>
+
+            <a href="/login.html" class="login-btn">
+                <span>⇥</span>
+                Login
+            </a>
+        </div>
+
+        <button class="mobile-menu" id="mobileMenu">
+            ☰
+        </button>
+
+    </div>
 </header>
 
 
-<!-- Hero Section -->
-<section id="home" class="hero">
+<!-- ================= HERO ================= -->
+
+<section class="hero" id="home">
+
+    <div class="hero-overlay"></div>
 
     <div class="hero-content">
 
-        <h1>
-            Welcome to <span>AI Smart Library</span>
-        </h1>
+        <div class="hero-text">
+
+            <div class="eyebrow">
+                <span class="pulse"></span>
+                INTELLIGENT DIGITAL LIBRARY
+            </div>
+
+            <h1>
+                Discover Your Next
+                <span>Great Read.</span>
+            </h1>
+
+            <p>
+                Explore thousands of books, find what you need faster,
+                and experience a smarter way to learn with AI-powered
+                library management.
+            </p>
+
+            <div class="hero-buttons">
+
+                <a href="books.html" class="primary-btn">
+                    Explore Books
+                    <span>→</span>
+                </a>
+
+                <a href="#ai" class="secondary-btn">
+                    <span>🤖</span>
+                    Ask AI
+                </a>
+
+            </div>
+
+            <div class="hero-trust">
+                <div class="avatars">
+                    <span>👨🏻</span>
+                    <span>👩🏻</span>
+                    <span>👨🏽</span>
+                    <span>👩🏽</span>
+                </div>
+
+                <div>
+                    <strong>350+ Active Readers</strong>
+                    <small>Learning every day</small>
+                </div>
+            </div>
+
+        </div>
+
+
+        <!-- HERO BOOK CARD -->
+
+        <div class="hero-book">
+
+            <div class="floating-card top-card">
+                <span class="float-icon blue">📖</span>
+                <div>
+                    <strong>120+</strong>
+                    <small>Total Books</small>
+                </div>
+            </div>
+
+            <div class="book-stack">
+
+                <div class="book book-one">
+                    <span>PYTHON</span>
+                    <strong>Programming</strong>
+                </div>
+
+                <div class="book book-two">
+                    <span>AI</span>
+                    <strong>Artificial<br>Intelligence</strong>
+                </div>
+
+                <div class="book book-three">
+                    <span>JAVA</span>
+                    <strong>Complete<br>Reference</strong>
+                </div>
+
+                <div class="book book-four">
+                    <span>DATA</span>
+                    <strong>Science</strong>
+                </div>
+
+            </div>
+
+            <div class="floating-card bottom-card">
+                <span class="float-icon purple">🤖</span>
+                <div>
+                    <strong>AI Powered</strong>
+                    <small>Smart recommendations</small>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= STATS ================= -->
+
+<section class="stats">
+
+    <div class="stats-container">
+
+        <div class="stat">
+            <span class="stat-icon">📚</span>
+            <div>
+                <strong>120+</strong>
+                <small>Total Books</small>
+            </div>
+        </div>
+
+        <div class="stat">
+            <span class="stat-icon">👥</span>
+            <div>
+                <strong>350+</strong>
+                <small>Active Users</small>
+            </div>
+        </div>
+
+        <div class="stat">
+            <span class="stat-icon">🏷️</span>
+            <div>
+                <strong>15+</strong>
+                <small>Categories</small>
+            </div>
+        </div>
+
+        <div class="stat">
+            <span class="stat-icon">🤖</span>
+            <div>
+                <strong>24/7</strong>
+                <small>AI Assistance</small>
+            </div>
+        </div>
+
+    </div>
+
+</section>
+
+
+<!-- ================= FEATURES ================= -->
+
+<section class="section" id="features">
+
+    <div class="section-heading">
+
+        <div>
+            <span class="section-label">WHY CHOOSE US</span>
+
+            <h2>
+                Everything You Need to
+                <span>Learn Smarter</span>
+            </h2>
+        </div>
 
         <p>
-            Discover, search and manage your books with
-            an intelligent digital library system.
+            A modern digital library designed to make discovering,
+            managing and learning from books easier.
         </p>
 
-        <div class="hero-buttons">
-            <button onclick="exploreBooks()">
-                Explore Books
-            </button>
-
-            <button class="ai-button" onclick="openChatbot()">
-                🤖 Ask AI
-            </button>
-        </div>
-
     </div>
 
-</section>
 
-
-<!-- Features -->
-<section class="features">
-
-    <h2>Smart Library Features</h2>
-
-    <div class="feature-container">
+    <div class="features-grid">
 
         <div class="feature-card">
-            <div class="icon">📖</div>
-            <h3>Book Management</h3>
+
+            <div class="feature-icon blue-gradient">
+                📚
+            </div>
+
+            <h3>Digital Collection</h3>
+
             <p>
-                Easily search and manage books digitally.
+                Access a growing collection of books from different
+                subjects and categories.
             </p>
+
+            <a href="books.html">Explore collection →</a>
+
         </div>
 
-        <div class="feature-card">
-            <div class="icon">🤖</div>
-            <h3>AI Assistant</h3>
-            <p>
-                Ask questions and get intelligent library assistance.
-            </p>
-        </div>
 
-        <div class="feature-card">
-            <div class="icon">🔍</div>
+        <div class="feature-card featured">
+
+            <div class="feature-icon purple-gradient">
+                🔎
+            </div>
+
             <h3>Smart Search</h3>
+
             <p>
-                Find books quickly using intelligent search.
+                Quickly find books using intelligent search and
+                category-based filtering.
             </p>
+
+            <a href="books.html">Search books →</a>
+
         </div>
+
 
         <div class="feature-card">
-            <div class="icon">📊</div>
-            <h3>Admin Dashboard</h3>
+
+            <div class="feature-icon orange-gradient">
+                📊
+            </div>
+
+            <h3>Easy Management</h3>
+
             <p>
-                Manage books, students and library activities.
+                Manage books, users, issues and returns from a
+                simple dashboard.
             </p>
+
+            <a href="/login.html">Open dashboard →</a>
+
+        </div>
+
+
+        <div class="feature-card">
+
+            <div class="feature-icon green-gradient">
+                🔐
+            </div>
+
+            <h3>Secure & Reliable</h3>
+
+            <p>
+                Keep your library information organized with secure
+                user access and management.
+            </p>
+
+            <a href="#about">Learn more →</a>
+
         </div>
 
     </div>
@@ -101,29 +317,267 @@
 </section>
 
 
-<!-- Books -->
-<section id="books" class="books">
+<!-- ================= POPULAR BOOKS ================= -->
 
-    <h2>Popular Books</h2>
+<section class="section books-section" id="books">
 
-    <div class="book-container">
+    <div class="section-heading">
 
-        <div class="book-card">
-            <h3>Python Programming</h3>
-            <p>Author: Mark Lutz</p>
-            <span>Available</span>
+        <div>
+            <span class="section-label">EXPLORE OUR COLLECTION</span>
+
+            <h2>
+                Popular <span>Books</span>
+            </h2>
         </div>
 
-        <div class="book-card">
-            <h3>Artificial Intelligence</h3>
-            <p>Author: Stuart Russell</p>
-            <span>Available</span>
+        <a href="books.html" class="view-all">
+            View All Books →
+        </a>
+
+    </div>
+
+
+    <div class="books-grid">
+
+
+        <article class="book-card">
+
+            <div class="book-cover python-cover">
+                <small>PROGRAMMING</small>
+                <strong>PYTHON</strong>
+                <span>Crash Course</span>
+            </div>
+
+            <div class="book-info">
+
+                <span class="category">Programming</span>
+
+                <h3>Python Crash Course</h3>
+
+                <p>Eric Matthes</p>
+
+                <div class="book-bottom">
+                    <span class="available">● Available</span>
+                    <button>View</button>
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="book-card">
+
+            <div class="book-cover c-cover">
+                <small>PROGRAMMING</small>
+                <strong>C</strong>
+                <span>Let's C</span>
+            </div>
+
+            <div class="book-info">
+
+                <span class="category">Programming</span>
+
+                <h3>Let's C</h3>
+
+                <p>Yashavant Kanetkar</p>
+
+                <div class="book-bottom">
+                    <span class="available">● Available</span>
+                    <button>View</button>
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="book-card">
+
+            <div class="book-cover java-cover">
+                <small>PROGRAMMING</small>
+                <strong>JAVA</strong>
+                <span>Complete Reference</span>
+            </div>
+
+            <div class="book-info">
+
+                <span class="category">Programming</span>
+
+                <h3>Java: Complete Reference</h3>
+
+                <p>Herbert Schildt</p>
+
+                <div class="book-bottom">
+                    <span class="available">● Available</span>
+                    <button>View</button>
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="book-card">
+
+            <div class="book-cover os-cover">
+                <small>COMPUTER SCIENCE</small>
+                <strong>OS</strong>
+                <span>Operating System</span>
+            </div>
+
+            <div class="book-info">
+
+                <span class="category">Computer Science</span>
+
+                <h3>Operating System</h3>
+
+                <p>Abraham Silberschatz</p>
+
+                <div class="book-bottom">
+                    <span class="available">● Available</span>
+                    <button>View</button>
+                </div>
+
+            </div>
+
+        </article>
+
+
+        <article class="book-card">
+
+            <div class="book-cover ai-cover">
+                <small>ARTIFICIAL INTELLIGENCE</small>
+                <strong>AI</strong>
+                <span>Intelligence</span>
+            </div>
+
+            <div class="book-info">
+
+                <span class="category">AI</span>
+
+                <h3>Artificial Intelligence</h3>
+
+                <p>Stuart Russell</p>
+
+                <div class="book-bottom">
+                    <span class="available">● Available</span>
+                    <button>View</button>
+                </div>
+
+            </div>
+
+        </article>
+
+    </div>
+
+</section>
+
+
+<!-- ================= AI SECTION ================= -->
+
+<section class="ai-section" id="ai">
+
+    <div class="ai-container">
+
+        <div class="ai-content">
+
+            <span class="section-label light-label">
+                INTELLIGENT ASSISTANT
+            </span>
+
+            <h2>
+                Meet Your
+                <span>AI Library Assistant</span>
+            </h2>
+
+            <p>
+                Not sure what to read? Ask our AI assistant for
+                book recommendations, search help, study guidance
+                and library assistance.
+            </p>
+
+            <div class="ai-features">
+
+                <div>
+                    <span>✓</span>
+                    Smart book recommendations
+                </div>
+
+                <div>
+                    <span>✓</span>
+                    Natural language search
+                </div>
+
+                <div>
+                    <span>✓</span>
+                    Instant library assistance
+                </div>
+
+            </div>
+
+            <button class="ai-btn" onclick="openAI()">
+                🤖 Ask AI Assistant
+                <span>→</span>
+            </button>
+
         </div>
 
-        <div class="book-card">
-            <h3>Clean Code</h3>
-            <p>Author: Robert C. Martin</p>
-            <span>Available</span>
+
+        <div class="ai-chat">
+
+            <div class="chat-header">
+                <div class="ai-avatar">🤖</div>
+
+                <div>
+                    <strong>Library AI</strong>
+                    <small>
+                        <span class="online-dot"></span>
+                        Online
+                    </small>
+                </div>
+
+                <span class="more">•••</span>
+            </div>
+
+
+            <div class="chat-body">
+
+                <div class="message bot">
+                    Hello! 👋
+                    <br>
+                    How can I help you discover your next book?
+                </div>
+
+                <div class="message user">
+                    Recommend me an AI book.
+                </div>
+
+                <div class="message bot">
+                    Great choice! 🤖
+                    <br><br>
+                    I recommend starting with
+                    <strong>Artificial Intelligence</strong>.
+                </div>
+
+            </div>
+
+
+            <div class="chat-input">
+
+                <input
+                    type="text"
+                    id="aiInput"
+                    placeholder="Ask something..."
+                >
+
+                <button onclick="sendMessage()">
+                    ↑
+                </button>
+
+            </div>
+
         </div>
 
     </div>
@@ -131,92 +585,188 @@
 </section>
 
 
-<!-- About -->
-<section id="about" class="about">
+<!-- ================= ABOUT ================= -->
 
-    <h2>About AI Smart Library</h2>
+<section class="section about-section" id="about">
 
-    <p>
-        AI Smart Library is a modern three-tier library
-        management system designed for students, librarians
-        and administrators.
-    </p>
+    <div class="about-grid">
 
-</section>
+        <div class="about-image">
 
+            <div class="library-illustration">
 
-<!-- Login Modal -->
-<div id="loginModal" class="modal">
+                <div class="shelf shelf-one">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
 
-    <div class="modal-content">
+                <div class="shelf shelf-two">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
 
-        <span class="close" onclick="closeLogin()">×</span>
+                <div class="lamp">💡</div>
 
-        <h2>Login</h2>
+            </div>
 
-        <input
-            type="email"
-            placeholder="Email"
-            id="email"
-        >
-
-        <input
-            type="password"
-            placeholder="Password"
-            id="password"
-        >
-
-        <button onclick="login()">
-            Login
-        </button>
-
-    </div>
-
-</div>
+        </div>
 
 
-<!-- AI Chatbot -->
-<div id="chatbot" class="chatbot">
+        <div class="about-content">
 
-    <div class="chat-header">
-        🤖 AI Library Assistant
-        <span onclick="closeChatbot()">×</span>
-    </div>
+            <span class="section-label">
+                ABOUT AI SMART LIBRARY
+            </span>
 
-    <div id="chatMessages" class="chat-messages">
+            <h2>
+                A Better Way to
+                <span>Learn & Discover</span>
+            </h2>
 
-        <div class="bot-message">
-            Hello! 👋 I'm your AI Library Assistant.
-            How can I help you?
+            <p>
+                AI Smart Library combines traditional library
+                management with modern technology to provide a
+                faster, easier and more intelligent learning experience.
+            </p>
+
+            <div class="about-points">
+
+                <div>
+                    <span>01</span>
+                    <strong>Discover</strong>
+                    <p>Find books that match your interests.</p>
+                </div>
+
+                <div>
+                    <span>02</span>
+                    <strong>Learn</strong>
+                    <p>Access useful learning resources easily.</p>
+                </div>
+
+                <div>
+                    <span>03</span>
+                    <strong>Manage</strong>
+                    <p>Manage your library experience digitally.</p>
+                </div>
+
+            </div>
+
         </div>
 
     </div>
 
-    <div class="chat-input">
+</section>
 
-        <input
-            type="text"
-            id="chatInput"
-            placeholder="Ask something..."
-        >
 
-        <button onclick="sendMessage()">
-            Send
-        </button>
+<!-- ================= CTA ================= -->
+
+<section class="cta">
+
+    <div class="cta-content">
+
+        <span>START YOUR LEARNING JOURNEY</span>
+
+        <h2>
+            Your Next Great Book
+            <br>
+            Is Waiting For You.
+        </h2>
+
+        <p>
+            Join our digital library and explore a smarter
+            way to learn.
+        </p>
+
+        <div class="cta-buttons">
+
+            <a href="books.html" class="primary-btn">
+                Explore Books →
+            </a>
+
+            <a href="/login.html" class="outline-btn">
+                Login to Library
+            </a>
+
+        </div>
 
     </div>
 
-</div>
+</section>
 
+
+<!-- ================= FOOTER ================= -->
 
 <footer>
-    <p>
-        © 2026 AI Smart Library Management System
-    </p>
+
+    <div class="footer-container">
+
+        <div class="footer-brand">
+
+            <a href="#" class="logo footer-logo">
+                <span class="logo-icon">📚</span>
+                <span>
+                    <strong>AI Smart</strong>
+                    <small>Library</small>
+                </span>
+            </a>
+
+            <p>
+                Making knowledge more accessible,
+                intelligent and enjoyable.
+            </p>
+
+        </div>
+
+
+        <div class="footer-links">
+
+            <div>
+                <h4>Library</h4>
+                <a href="books.html">Books</a>
+                <a href="#features">Features</a>
+                <a href="#ai">AI Assistant</a>
+            </div>
+
+            <div>
+                <h4>Company</h4>
+                <a href="#about">About</a>
+                <a href="#">Contact</a>
+                <a href="#">Privacy</a>
+            </div>
+
+            <div>
+                <h4>Account</h4>
+                <a href="/login.html">Login</a>
+                <a href="/register">Register</a>
+            </div>
+
+        </div>
+
+    </div>
+
+
+    <div class="footer-bottom">
+
+        <span>
+            © 2026 AI Smart Library. All rights reserved.
+        </span>
+
+        <span>
+            Built with ❤️ and AI
+        </span>
+
+    </div>
+
 </footer>
 
 
-<script src="js/script.js"></script>
+<script src="script.js"></script>
 
 </body>
 </html>
