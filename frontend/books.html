@@ -3,40 +3,57 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Digital Library - Books</title>
+    <title>Books - Smart Digital Library</title>
     <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<header class="topbar">
-    <div class="logo">📚 Smart Digital Library</div>
+<header class="navbar light-nav">
+    <div class="nav-container">
+        <a href="index.html" class="brand dark-brand">
+            <span class="brand-icon">📚</span>
+            <span>
+                <strong>Smart Library</strong>
+                <small>Digital Knowledge Platform</small>
+            </span>
+        </a>
 
-    <nav>
-        <a href="index.html">Home</a>
-        <a href="books.html" class="active">Books</a>
-        <a href="login.html">Login</a>
-    </nav>
+        <nav class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="books.html" class="active">Books</a>
+            <a href="ai.html">AI Assistant</a>
+        </nav>
+
+        <a href="login.html" class="nav-login">Login →</a>
+    </div>
 </header>
 
-<main class="books-container">
+<main class="page">
 
-    <section class="books-header">
-        <div>
-            <h1>Library Books</h1>
-            <p>Browse and search available books.</p>
-        </div>
+<section class="page-hero">
+    <div>
+        <span class="section-label">LIBRARY COLLECTION</span>
+        <h1>Explore Our <span>Books</span></h1>
+        <p>Search thousands of possibilities and discover your next book.</p>
+    </div>
 
-        <button onclick="loadBooks()">🔄 Refresh</button>
-    </section>
+    <a href="ai.html" class="btn btn-primary">🤖 Ask AI</a>
+</section>
 
-    <section class="book-filters">
+<section class="library-panel">
 
+    <div class="search-bar">
+        <span>🔎</span>
         <input
-            type="text"
             id="searchInput"
+            type="text"
             placeholder="Search by title, author or ISBN..."
         >
+        <button onclick="applyFilters()">Search</button>
+    </div>
+
+    <div class="filter-row">
 
         <select id="categoryFilter">
             <option value="">All Categories</option>
@@ -48,238 +65,39 @@
             <option value="English">English</option>
         </select>
 
-        <button onclick="applyFilters()">Search</button>
-        <button onclick="clearFilters()">Clear</button>
+        <button class="filter-clear" onclick="clearFilters()">Clear</button>
 
-    </section>
+        <button class="refresh-btn" onclick="loadBooks()">↻ Refresh</button>
+
+    </div>
 
     <div id="message"></div>
 
-    <section>
-        <div class="books-count">
-            <span id="booksCount">Loading books...</span>
+    <div class="books-toolbar">
+        <div>
+            <strong>Library Collection</strong>
+            <span id="booksCount">Loading...</span>
         </div>
+    </div>
 
-        <div id="booksGrid" class="books-grid"></div>
-    </section>
+    <div id="booksGrid" class="books-grid"></div>
+
+</section>
 
 </main>
 
-<script>
-
-const API_URL = "";
-
-async function loadBooks() {
-
-    const grid = document.getElementById("booksGrid");
-    const message = document.getElementById("message");
-
-    grid.innerHTML = "<p>Loading books...</p>";
-    message.textContent = "";
-
-    try {
-
-        const response = await fetch(`${API_URL}/api/books`);
-
-        if (!response.ok) {
-            throw new Error("Unable to load books");
-        }
-
-        const data = await response.json();
-
-        displayBooks(data.books || []);
-
-    } catch (error) {
-
-        console.error(error);
-
-        grid.innerHTML = "";
-        message.textContent =
-            "Unable to connect to the backend. Please make sure the backend is running.";
-
-        message.className = "error-message";
-    }
-}
-
-
-async function applyFilters() {
-
-    const search = document
-        .getElementById("searchInput")
-        .value
-        .trim();
-
-    const category = document
-        .getElementById("categoryFilter")
-        .value;
-
-    const language = document
-        .getElementById("languageFilter")
-        .value;
-
-    const params = new URLSearchParams();
-
-    if (search) {
-        params.append("q", search);
-    }
-
-    if (category) {
-        params.append("category", category);
-    }
-
-    if (language) {
-        params.append("language", language);
-    }
-
-    const grid = document.getElementById("booksGrid");
-
-    grid.innerHTML = "<p>Searching books...</p>";
-
-    try {
-
-        const url = params.toString()
-            ? `${API_URL}/api/books?${params.toString()}`
-            : `${API_URL}/api/books`;
-
-        const response = await fetch(url);
-
-        if (!response.ok) {
-            throw new Error("Search failed");
-        }
-
-        const data = await response.json();
-
-        displayBooks(data.books || []);
-
-    } catch (error) {
-
-        console.error(error);
-
-        grid.innerHTML =
-            "<p class='error-message'>Unable to search books.</p>";
-    }
-}
-
-
-function displayBooks(books) {
-
-    const grid = document.getElementById("booksGrid");
-    const count = document.getElementById("booksCount");
-
-    grid.innerHTML = "";
-
-    count.textContent =
-        `${books.length} book${books.length === 1 ? "" : "s"} found`;
-
-    if (books.length === 0) {
-
-        grid.innerHTML = `
-            <div class="no-books">
-                <h3>📚 No books found</h3>
-                <p>Try another search or filter.</p>
-            </div>
-        `;
-
-        return;
-    }
-
-    books.forEach(book => {
-
-        const card = document.createElement("div");
-
-        card.className = "book-card";
-
-        card.innerHTML = `
-            <div class="book-icon">📖</div>
-
-            <div class="book-content">
-
-                <h2>${escapeHtml(book.title)}</h2>
-
-                <p>
-                    <strong>Author:</strong>
-                    ${escapeHtml(book.author)}
-                </p>
-
-                <p>
-                    <strong>Category:</strong>
-                    ${escapeHtml(book.category || "N/A")}
-                </p>
-
-                <p>
-                    <strong>Language:</strong>
-                    ${escapeHtml(book.language || "English")}
-                </p>
-
-                <p>
-                    <strong>ISBN:</strong>
-                    ${escapeHtml(book.isbn || "N/A")}
-                </p>
-
-                <div class="book-stock">
-
-                    <span>
-                        Total: ${book.quantity}
-                    </span>
-
-                    <span class="${
-                        book.available_quantity > 0
-                            ? "available"
-                            : "unavailable"
-                    }">
-                        Available: ${book.available_quantity}
-                    </span>
-
-                </div>
-
-                <p class="book-description">
-                    ${escapeHtml(
-                        book.description || "No description available."
-                    )}
-                </p>
-
-            </div>
-        `;
-
-        grid.appendChild(card);
-    });
-}
-
-
-function clearFilters() {
-
-    document.getElementById("searchInput").value = "";
-    document.getElementById("categoryFilter").value = "";
-    document.getElementById("languageFilter").value = "";
-
-    loadBooks();
-}
-
-
-function escapeHtml(value) {
-
-    const div = document.createElement("div");
-
-    div.textContent = value ?? "";
-
-    return div.innerHTML;
-}
-
-
-document
-    .getElementById("searchInput")
-    .addEventListener("keypress", function(event) {
-
-        if (event.key === "Enter") {
-            applyFilters();
-        }
-
-    });
-
-
-loadBooks();
-
-</script>
+<footer>
+    <div class="footer-inner">
+        <div class="brand dark-brand">
+            <span class="brand-icon">📚</span>
+            <strong>Smart Digital Library</strong>
+        </div>
+
+        <p>Smart books. Smart search. Smarter learning.</p>
+    </div>
+</footer>
+
+<script src="books.js"></script>
 
 </body>
 </html>

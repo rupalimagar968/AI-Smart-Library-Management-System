@@ -3,77 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Smart Library</title>
-    <link rel="stylesheet" href="css/style.css">
+    <title>Login | Smart Digital Library</title>
+    <link rel="stylesheet" href="style.css">
 </head>
-<body>
 
-<div class="auth-container">
-    <div class="auth-card">
-        <h1>📚 Smart Library</h1>
-        <h2>Login</h2>
+<body class="auth-page">
 
-        <form id="loginForm">
-            <input
-                type="text"
-                id="username"
-                placeholder="Username"
-                required
-            >
+<div class="auth-layout">
 
-            <input
-                type="password"
-                id="password"
-                placeholder="Password"
-                required
-            >
+    <div class="auth-showcase">
 
-            <button type="submit">Login</button>
-        </form>
+        <a href="index.html" class="auth-brand">
+            <span>📚</span>
+            <div>
+                <strong>Smart Library</strong>
+                <small>Digital Knowledge Platform</small>
+            </div>
+        </a>
 
-        <p id="message"></p>
+        <div class="auth-showcase-content">
+            <span class="section-label">WELCOME BACK</span>
 
-        <p>
-            Don't have an account?
-            <a href="register.html">Create Account</a>
-        </p>
+            <h1>
+                Your knowledge
+                <span>starts here.</span>
+            </h1>
+
+            <p>
+                Sign in to continue exploring books, smart search
+                and your AI-powered library assistant.
+            </p>
+
+            <div class="auth-benefits">
+                <div>
+                    <span>📚</span>
+                    <div>
+                        <strong>Smart Collection</strong>
+                        <small>Explore your digital library</small>
+                    </div>
+                </div>
+
+                <div>
+                    <span>🤖</span>
+                    <div>
+                        <strong>AI Assistant</strong>
+                        <small>Get intelligent book recommendations</small>
+                    </div>
+                </div>
+
+                <div>
+                    <span>⚡</span>
+                    <div>
+                        <strong>Fast & Simple</strong>
+                        <small>Access your library instantly</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
+
+    <div class="auth-form-area">
+
+        <div class="auth-card">
+
+            <div class="mobile-auth-logo">📚</div>
+
+            <span class="auth-mini-label">SMART DIGITAL LIBRARY</span>
+
+            <h2>Welcome back 👋</h2>
+
+            <p class="auth-subtitle">
+                Sign in to your library account
+            </p>
+
+            <form id="loginForm">
+
+                <label for="name">Name</label>
+
+                <div class="auth-input">
+                    <span>👤</span>
+                    <input
+                        type="text"
+                        id="name"
+                        placeholder="Enter your name"
+                        autocomplete="username"
+                        required
+                    >
+                </div>
+
+                <label for="password">Password</label>
+
+                <div class="auth-input">
+                    <span>🔒</span>
+                    <input
+                        type="password"
+                        id="password"
+                        placeholder="Enter your password"
+                        autocomplete="current-password"
+                        required
+                    >
+                    <button type="button" class="password-toggle" onclick="togglePassword()">👁</button>
+                </div>
+
+                <div class="auth-options">
+                    <label class="remember">
+                        <input type="checkbox" id="remember">
+                        <span>Remember me</span>
+                    </label>
+
+                    <a href="forgot-password.html">Forgot password?</a>
+                </div>
+
+                <button type="submit" class="auth-submit">
+                    Sign In <span>→</span>
+                </button>
+
+            </form>
+
+            <div id="message" class="auth-message"></div>
+
+            <div class="auth-divider">
+                <span>New to Smart Library?</span>
+            </div>
+
+            <a href="register.html" class="create-account">
+                Create New Account
+            </a>
+
+            <a href="index.html" class="back-home">
+                ← Back to Home
+            </a>
+
+        </div>
+
+    </div>
+
 </div>
 
 <script>
-const API_URL = "";
+const API_URL = "http://localhost:5000";
+
+function togglePassword() {
+    const input = document.getElementById("password");
+    input.type = input.type === "password" ? "text" : "password";
+}
 
 document.getElementById("loginForm").addEventListener("submit", async function(e) {
+
     e.preventDefault();
 
-    const username = document.getElementById("username").value;
+    const name = document.getElementById("name").value.trim();
     const password = document.getElementById("password").value;
     const message = document.getElementById("message");
+    const remember = document.getElementById("remember");
+
+    message.className = "auth-message";
+    message.textContent = "Signing in...";
 
     try {
+
         const response = await fetch(`${API_URL}/api/login`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                username: username,
+                name: name,
                 password: password
             })
         });
 
         const data = await response.json();
 
-        if (response.ok) {
-            localStorage.setItem("username", data.username);
-            window.location.href = "index.html";
-        } else {
+        if (!response.ok) {
+            message.className = "auth-message error";
             message.textContent = data.message || "Login failed.";
+            return;
         }
 
+        if (remember.checked) {
+            localStorage.setItem("library_token", data.token);
+            localStorage.setItem("library_name", data.name);
+        } else {
+            sessionStorage.setItem("library_token", data.token);
+            sessionStorage.setItem("library_name", data.name);
+        }
+
+        message.className = "auth-message success";
+        message.textContent = "Login successful! Redirecting...";
+
+        setTimeout(() => {
+            window.location.href = "index.html";
+        }, 700);
+
     } catch (error) {
-        message.textContent = "Unable to connect to backend.";
+
         console.error(error);
+
+        message.className = "auth-message error";
+        message.textContent = "Unable to connect to backend.";
     }
 });
 </script>

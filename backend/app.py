@@ -54,19 +54,34 @@ def api_health():
 def register():
     data = request.get_json(silent=True) or {}
 
-    username = data.get("username", "").strip()
+    name = str(data.get("name", "")).strip()
     password = data.get("password", "")
+    email = str(data.get("email", "")).strip()
 
-    if not username or not password:
+    # Name and password are mandatory
+    if not name or not password:
         return jsonify({
             "success": False,
-            "message": "Username and password are required"
+            "message": "Name and password are required"
+        }), 400
+
+    if len(name) < 2:
+        return jsonify({
+            "success": False,
+            "message": "Name must contain at least 2 characters"
         }), 400
 
     if len(password) < 6:
         return jsonify({
             "success": False,
             "message": "Password must be at least 6 characters"
+        }), 400
+
+    # Email is optional, but validate it when provided
+    if email and ("@" not in email or "." not in email.split("@")[-1]):
+        return jsonify({
+            "success": False,
+            "message": "Please enter a valid email address"
         }), 400
 
     connection = None
@@ -77,8 +92,8 @@ def register():
         cursor = connection.cursor(dictionary=True)
 
         cursor.execute(
-            "SELECT id FROM users WHERE username = %s",
-            (username,)
+            "SELECT id FROM users WHERE LOWER(name) = LOWER(%s) OR LOWER(username) = LOWER(%s)",
+            (name, name)
         )
 
         existing_user = cursor.fetchone()
@@ -86,17 +101,31 @@ def register():
         if existing_user:
             return jsonify({
                 "success": False,
-                "message": "Username already registered"
+                "message": "An account with this name already exists"
             }), 409
+
+        if email:
+            cursor.execute(
+                "SELECT id FROM users WHERE LOWER(email) = LOWER(%s)",
+                (email,)
+            )
+
+            existing_email = cursor.fetchone()
+
+            if existing_email:
+                return jsonify({
+                    "success": False,
+                    "message": "This email is already registered"
+                }), 409
 
         password_hash = generate_password_hash(password)
 
         cursor.execute(
             """
-            INSERT INTO users (username, password_hash)
-            VALUES (%s, %s)
+            INSERT INTO users (username, name, email, password_hash)
+            VALUES (%s, %s, %s, %s)
             """,
-            (username, password_hash)
+            (name, name, email if email else None, password_hash)
         )
 
         connection.commit()
@@ -112,8 +141,7 @@ def register():
 
         return jsonify({
             "success": False,
-            "message": "Database error",
-            "error": str(error)
+            "message": "Database error"
         }), 500
 
     finally:
@@ -128,13 +156,13 @@ def register():
 def login():
     data = request.get_json(silent=True) or {}
 
-    username = data.get("username", "").strip()
+    name = str(data.get("name", "")).strip()
     password = data.get("password", "")
 
-    if not username or not password:
+    if not name or not password:
         return jsonify({
             "success": False,
-            "message": "Username and password are required"
+            "message": "Name and password are required"
         }), 400
 
     connection = None
@@ -146,11 +174,13 @@ def login():
 
         cursor.execute(
             """
-            SELECT id, username, password_hash
+            SELECT id, username, name, email, password_hash
             FROM users
-            WHERE username = %s
+            WHERE LOWER(name) = LOWER(%s)
+               OR LOWER(username) = LOWER(%s)
+            LIMIT 1
             """,
-            (username,)
+            (name, name)
         )
 
         user = cursor.fetchone()
@@ -158,7 +188,7 @@ def login():
         if not user:
             return jsonify({
                 "success": False,
-                "message": "Invalid username or password"
+                "message": "Invalid name or password"
             }), 401
 
         if not check_password_hash(
@@ -167,11 +197,12 @@ def login():
         ):
             return jsonify({
                 "success": False,
-                "message": "Invalid username or password"
+                "message": "Invalid name or password"
             }), 401
 
         payload = {
             "user_id": user["id"],
+            "name": user["name"] or user["username"],
             "username": user["username"],
             "exp": datetime.now(timezone.utc)
             + timedelta(hours=JWT_EXPIRATION_HOURS)
@@ -187,14 +218,14 @@ def login():
             "success": True,
             "message": "Login successful",
             "token": token,
+            "name": user["name"] or user["username"],
             "username": user["username"]
         })
 
-    except mysql.connector.Error as error:
+    except mysql.connector.Error:
         return jsonify({
             "success": False,
-            "message": "Database error",
-            "error": str(error)
+            "message": "Database error"
         }), 500
 
     finally:
@@ -205,6 +236,85 @@ def login():
             connection.close()
 
 
+@app.route("/api/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json(silent=True) or {}
+
+    name = str(data.get("name", "")).strip()
+    email = str(data.get("email", "")).strip()
+    new_password = data.get("new_password", "")
+
+    if not name or not email or not new_password:
+        return jsonify({
+            "success": False,
+            "message": "Name, email and new password are required"
+        }), 400
+
+    if len(new_password) < 6:
+        return jsonify({
+            "success": False,
+            "message": "New password must be at least 6 characters"
+        }), 400
+
+    connection = None
+    cursor = None
+
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT id
+            FROM users
+            WHERE LOWER(name) = LOWER(%s)
+              AND LOWER(email) = LOWER(%s)
+            LIMIT 1
+            """,
+            (name, email)
+        )
+
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({
+                "success": False,
+                "message": "Name and email do not match our records"
+            }), 404
+
+        password_hash = generate_password_hash(new_password)
+
+        cursor.execute(
+            """
+            UPDATE users
+            SET password_hash = %s
+            WHERE id = %s
+            """,
+            (password_hash, user["id"])
+        )
+
+        connection.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Password reset successfully. You can now login."
+        })
+
+    except mysql.connector.Error:
+        if connection:
+            connection.rollback()
+
+        return jsonify({
+            "success": False,
+            "message": "Database error"
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+
+        if connection:
+            connection.close()
 
 
 # ============================================================
