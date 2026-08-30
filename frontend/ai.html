@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant - Smart Digital Library</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header class="navbar light-nav">
+    <div class="nav-container">
+        <a href="index.html" class="brand dark-brand">
+            <span class="brand-icon">📚</span>
+            <span>
+                <strong>Smart Library</strong>
+                <small>Digital Knowledge Platform</small>
+            </span>
+        </a>
+
+        <nav class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="books.html">Books</a>
+            <a href="ai.html" class="active">AI Assistant</a>
+        </nav>
+
+        <a href="login.html" class="nav-login">Login →</a>
+    </div>
+</header>
+
+<main class="ai-page">
+
+<section class="ai-hero">
+
+    <div class="ai-intro">
+        <span class="section-label">SMART LIBRARY AI</span>
+
+        <h1>
+            Meet your
+            <span>AI Library Assistant.</span>
+        </h1>
+
+        <p>
+            Ask about books, authors, categories or find the right
+            book for your learning journey.
+        </p>
+
+        <div class="ai-suggestions">
+            <button onclick="askSuggestion('Which Python books are available?')">
+                🐍 Python books
+            </button>
+
+            <button onclick="askSuggestion('Show me Computer Science books')">
+                💻 Computer Science
+            </button>
+
+            <button onclick="askSuggestion('Recommend a book for learning AI')">
+                🤖 AI recommendation
+            </button>
+        </div>
+    </div>
+
+    <div class="ai-robot">
+        <div class="robot-glow"></div>
+        <div class="robot">🤖</div>
+        <span>AI ONLINE</span>
+    </div>
+
+</section>
+
+<section class="chat-wrapper">
+
+    <div class="chat-header">
+        <div class="chat-agent">
+            <div class="ai-avatar">🤖</div>
+            <div>
+                <strong>Library AI</strong>
+                <small><span></span> Ready to help</small>
+            </div>
+        </div>
+
+        <button onclick="clearChat()">New Chat +</button>
+    </div>
+
+    <div id="chatMessages" class="chat-messages">
+
+        <div class="message ai-message">
+            <div class="message-avatar">🤖</div>
+            <div class="message-content">
+                <strong>Library AI</strong>
+                <p>
+                    Hello! 👋 I'm your Smart Library Assistant.
+                    Ask me about books, authors, categories or recommendations.
+                </p>
+            </div>
+        </div>
+
+    </div>
+
+    <div class="chat-input-area">
+        <input
+            id="chatInput"
+            type="text"
+            placeholder="Ask something about your library..."
+        >
+
+        <button onclick="sendMessage()">➤</button>
+    </div>
+
+</section>
+
+</main>
+
+<footer>
+    <div class="footer-inner">
+        <div class="brand dark-brand">
+            <span class="brand-icon">📚</span>
+            <strong>Smart Digital Library</strong>
+        </div>
+        <p>AI-powered learning and discovery.</p>
+    </div>
+</footer>
+
+<script src="ai.js"></script>
+
+</body>
+</html>
