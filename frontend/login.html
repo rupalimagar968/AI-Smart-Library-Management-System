@@ -146,7 +146,11 @@ const API_URL = "http://localhost:5000";
 
 function togglePassword() {
     const input = document.getElementById("password");
-    input.type = input.type === "password" ? "text" : "password";
+
+    if (!input) return;
+
+    input.type =
+        input.type === "password" ? "text" : "password";
 }
 
 document.getElementById("loginForm").addEventListener("submit", async function(e) {
@@ -161,6 +165,12 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
     message.className = "auth-message";
     message.textContent = "Signing in...";
 
+    if (!name || !password) {
+        message.className = "auth-message error";
+        message.textContent = "Name and password are required.";
+        return;
+    }
+
     try {
 
         const response = await fetch(`${API_URL}/api/login`, {
@@ -174,35 +184,71 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
             })
         });
 
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
 
         if (!response.ok) {
             message.className = "auth-message error";
-            message.textContent = data.message || "Login failed.";
+            message.textContent =
+                data.message || "Login failed.";
             return;
         }
 
-        if (remember.checked) {
-            localStorage.setItem("library_token", data.token);
-            localStorage.setItem("library_name", data.name);
-        } else {
-            sessionStorage.setItem("library_token", data.token);
-            sessionStorage.setItem("library_name", data.name);
+        const storage =
+            remember && remember.checked
+                ? localStorage
+                : sessionStorage;
+
+        storage.setItem("library_token", data.token);
+        storage.setItem(
+            "library_name",
+            data.name || data.username
+        );
+        storage.setItem(
+            "library_username",
+            data.username || ""
+        );
+        storage.setItem(
+            "library_email",
+            data.email || ""
+        );
+        storage.setItem(
+            "is_admin",
+            data.is_admin ? "true" : "false"
+        );
+
+        /*
+         * Keep the original token keys for compatibility
+         * with existing frontend code.
+         */
+        if (remember && remember.checked) {
+            localStorage.setItem("token", data.token);
+            localStorage.setItem(
+                "username",
+                data.username || ""
+            );
         }
 
         message.className = "auth-message success";
-        message.textContent = "Login successful! Redirecting...";
+        message.textContent =
+            "Login successful! Redirecting...";
 
         setTimeout(() => {
-            window.location.href = "index.html";
+
+            if (data.is_admin) {
+                window.location.href = "admin.html";
+            } else {
+                window.location.href = "index.html";
+            }
+
         }, 700);
 
     } catch (error) {
 
-        console.error(error);
+        console.error("Login error:", error);
 
         message.className = "auth-message error";
-        message.textContent = "Unable to connect to backend.";
+        message.textContent =
+            "Unable to connect to backend.";
     }
 });
 </script>

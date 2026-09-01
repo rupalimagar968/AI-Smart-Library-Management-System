@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Admin Dashboard - Smart Library</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="admin-body">
+
+<div id="adminApp">
+
+    <aside class="admin-sidebar">
+
+        <div class="admin-logo">
+            <div class="admin-logo-icon">📚</div>
+
+            <div>
+                <strong>Smart Library</strong>
+                <small>ADMIN PANEL</small>
+            </div>
+        </div>
+
+        <nav class="admin-nav">
+
+            <button class="admin-nav-item active"
+                    onclick="showAdminSection('dashboard', this)">
+                <span>▦</span>
+                Dashboard
+            </button>
+
+            <button class="admin-nav-item"
+                    onclick="showAdminSection('users', this)">
+                <span>👥</span>
+                Users
+            </button>
+
+            <button class="admin-nav-item"
+                    onclick="showAdminSection('books', this)">
+                <span>📚</span>
+                Books
+            </button>
+
+            <button class="admin-nav-item"
+                    onclick="showAdminSection('activity', this)">
+                <span>⚡</span>
+                Activity
+            </button>
+
+        </nav>
+
+        <div class="admin-sidebar-bottom">
+
+            <a href="index.html" class="admin-home-link">
+                ← Back to Library
+            </a>
+
+            <button onclick="adminLogout()" class="admin-logout">
+                ⎋ Logout
+            </button>
+
+        </div>
+
+    </aside>
+
+
+    <main class="admin-main">
+
+        <header class="admin-topbar">
+
+            <div>
+                <span class="admin-eyebrow">SMART LIBRARY / ADMIN</span>
+                <h1 id="adminPageTitle">Dashboard</h1>
+            </div>
+
+            <div class="admin-profile">
+
+                <div class="admin-avatar">A</div>
+
+                <div>
+                    <strong id="adminName">Administrator</strong>
+                    <small>System Administrator</small>
+                </div>
+
+            </div>
+
+        </header>
+
+
+        <div id="adminMessage" class="admin-message"></div>
+
+
+        <!-- DASHBOARD -->
+
+        <section id="dashboardSection" class="admin-section active">
+
+            <div class="admin-stat-grid">
+
+                <div class="admin-stat-card">
+                    <div class="stat-icon">👥</div>
+                    <div>
+                        <small>Total Users</small>
+                        <strong id="statUsers">—</strong>
+                    </div>
+                </div>
+
+                <div class="admin-stat-card">
+                    <div class="stat-icon">📚</div>
+                    <div>
+                        <small>Book Titles</small>
+                        <strong id="statBooks">—</strong>
+                    </div>
+                </div>
+
+                <div class="admin-stat-card">
+                    <div class="stat-icon">📦</div>
+                    <div>
+                        <small>Total Copies</small>
+                        <strong id="statCopies">—</strong>
+                    </div>
+                </div>
+
+                <div class="admin-stat-card">
+                    <div class="stat-icon">✓</div>
+                    <div>
+                        <small>Available Copies</small>
+                        <strong id="statAvailable">—</strong>
+                    </div>
+                </div>
+
+            </div>
+
+
+            <div class="admin-dashboard-grid">
+
+                <div class="admin-panel">
+
+                    <div class="admin-panel-header">
+                        <div>
+                            <span>RECENT USERS</span>
+                            <h2>New Accounts</h2>
+                        </div>
+
+                        <button onclick="showAdminSectionByName('users')">
+                            View All
+                        </button>
+                    </div>
+
+                    <div id="recentUsers" class="admin-list"></div>
+
+                </div>
+
+
+                <div class="admin-panel">
+
+                    <div class="admin-panel-header">
+                        <div>
+                            <span>RECENT BOOKS</span>
+                            <h2>Library Updates</h2>
+                        </div>
+
+                        <button onclick="showAdminSectionByName('books')">
+                            Manage
+                        </button>
+                    </div>
+
+                    <div id="recentBooks" class="admin-list"></div>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- USERS -->
+
+        <section id="usersSection" class="admin-section">
+
+            <div class="admin-panel">
+
+                <div class="admin-panel-header">
+
+                    <div>
+                        <span>USER MANAGEMENT</span>
+                        <h2>Registered Users</h2>
+                    </div>
+
+                    <div class="admin-search">
+                        <input
+                            id="userSearch"
+                            type="text"
+                            placeholder="Search users..."
+                            oninput="loadUsers()"
+                        >
+                    </div>
+
+                </div>
+
+                <div class="admin-table-wrapper">
+
+                    <table class="admin-table">
+
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>User</th>
+                                <th>Email</th>
+                                <th>Created</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="usersTable"></tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- BOOKS -->
+
+        <section id="booksSection" class="admin-section">
+
+            <div class="admin-panel">
+
+                <div class="admin-panel-header">
+
+                    <div>
+                        <span>BOOK MANAGEMENT</span>
+                        <h2>Library Collection</h2>
+                    </div>
+
+                    <div class="admin-actions">
+
+                        <input
+                            id="bookSearch"
+                            type="text"
+                            placeholder="Search books..."
+                            oninput="loadAdminBooks()"
+                        >
+
+                        <button class="admin-primary-btn"
+                                onclick="openBookModal()">
+                            + Add Book
+                        </button>
+
+                    </div>
+
+                </div>
+
+                <div class="admin-table-wrapper">
+
+                    <table class="admin-table">
+
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Book</th>
+                                <th>Author</th>
+                                <th>Category</th>
+                                <th>Copies</th>
+                                <th>Available</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+
+                        <tbody id="booksTable"></tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ACTIVITY -->
+
+        <section id="activitySection" class="admin-section">
+
+            <div class="admin-panel">
+
+                <div class="admin-panel-header">
+                    <div>
+                        <span>AUDIT LOG</span>
+                        <h2>Admin Activity</h2>
+                    </div>
+                </div>
+
+                <div id="activityList" class="activity-list"></div>
+
+            </div>
+
+        </section>
+
+    </main>
+
+</div>
+
+
+<!-- BOOK MODAL -->
+
+<div id="bookModal" class="admin-modal">
+
+    <div class="admin-modal-card">
+
+        <div class="admin-modal-header">
+
+            <div>
+                <span>LIBRARY COLLECTION</span>
+                <h2 id="bookModalTitle">Add New Book</h2>
+            </div>
+
+            <button onclick="closeBookModal()">×</button>
+
+        </div>
+
+        <form id="bookForm">
+
+            <input type="hidden" id="bookId">
+
+            <div class="admin-form-grid">
+
+                <label>
+                    Title
+                    <input id="bookTitle" required>
+                </label>
+
+                <label>
+                    Author
+                    <input id="bookAuthor" required>
+                </label>
+
+                <label>
+                    Category
+                    <input id="bookCategory">
+                </label>
+
+                <label>
+                    Language
+                    <input id="bookLanguage" value="English">
+                </label>
+
+                <label>
+                    ISBN
+                    <input id="bookIsbn">
+                </label>
+
+                <label>
+                    Quantity
+                    <input id="bookQuantity"
+                           type="number"
+                           min="1"
+                           value="1"
+                           required>
+                </label>
+
+            </div>
+
+            <label class="admin-full-field">
+                Description
+                <textarea id="bookDescription"
+                          rows="4"></textarea>
+            </label>
+
+            <div class="admin-modal-actions">
+
+                <button type="button"
+                        class="admin-cancel-btn"
+                        onclick="closeBookModal()">
+                    Cancel
+                </button>
+
+                <button type="submit"
+                        class="admin-primary-btn">
+                    Save Book
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+
+<script src="admin.js"></script>
+
+</body>
+</html>

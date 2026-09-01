@@ -79,9 +79,14 @@ if (loginForm) {
 
             localStorage.setItem("token", data.token);
             localStorage.setItem("username", data.username);
+            localStorage.setItem("library_token", data.token);
+            localStorage.setItem("library_name", data.name || data.username);
+            localStorage.setItem("library_username", data.username);
+            localStorage.setItem("is_admin", data.is_admin ? "true" : "false");
 
             if (data.email) {
                 localStorage.setItem("email", data.email);
+                localStorage.setItem("library_email", data.email);
             }
 
             showMessage(
