@@ -7,10 +7,12 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from books import books_bp
+from admin import admin_bp
 
 app = Flask(__name__)
 CORS(app)
 app.register_blueprint(books_bp)
+app.register_blueprint(admin_bp)
 
 JWT_SECRET = os.getenv("JWT_SECRET", "change-this-secret")
 JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
@@ -156,7 +158,10 @@ def register():
 def login():
     data = request.get_json(silent=True) or {}
 
-    name = str(data.get("name", "")).strip()
+    name = str(
+        data.get("name", data.get("username", ""))
+    ).strip()
+
     password = data.get("password", "")
 
     if not name or not password:
@@ -200,10 +205,21 @@ def login():
                 "message": "Invalid name or password"
             }), 401
 
+        admin_username = os.getenv(
+            "ADMIN_USERNAME",
+            "admin"
+        )
+
+        is_admin = (
+            user["username"].lower()
+            == admin_username.lower()
+        )
+
         payload = {
             "user_id": user["id"],
             "name": user["name"] or user["username"],
             "username": user["username"],
+            "is_admin": is_admin,
             "exp": datetime.now(timezone.utc)
             + timedelta(hours=JWT_EXPIRATION_HOURS)
         }
@@ -219,7 +235,9 @@ def login():
             "message": "Login successful",
             "token": token,
             "name": user["name"] or user["username"],
-            "username": user["username"]
+            "username": user["username"],
+            "email": user["email"],
+            "is_admin": is_admin
         })
 
     except mysql.connector.Error:
