@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Assistant - Smart Digital Library</title>
     <link rel="stylesheet" href="style.css">
+    <script>
+        if (!localStorage.getItem("library_token") &&
+            !sessionStorage.getItem("library_token") &&
+            !localStorage.getItem("token")) {
+            window.location.replace("/");
+        }
+    </script>
 </head>
 
 <body>
@@ -122,6 +129,7 @@
     </div>
 </footer>
 
+<script src="session.js"></script>
 <script src="ai.js"></script>
 
 </body>

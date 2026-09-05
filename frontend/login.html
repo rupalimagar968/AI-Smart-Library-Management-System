@@ -197,6 +197,15 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
             remember && remember.checked
                 ? localStorage
                 : sessionStorage;
+        const otherStorage =
+            storage === localStorage ? sessionStorage : localStorage;
+
+        otherStorage.removeItem("library_token");
+        otherStorage.removeItem("library_name");
+        otherStorage.removeItem("library_username");
+        otherStorage.removeItem("library_email");
+        otherStorage.removeItem("is_admin");
+        otherStorage.removeItem("token");
 
         storage.setItem("library_token", data.token);
         storage.setItem(
@@ -234,7 +243,11 @@ document.getElementById("loginForm").addEventListener("submit", async function(e
 
         setTimeout(() => {
 
-            if (data.is_admin) {
+            const nextPage = new URLSearchParams(window.location.search).get("next");
+
+            if (nextPage === "books.html") {
+                window.location.href = "books.html";
+            } else if (data.is_admin) {
                 window.location.href = "admin.html";
             } else {
                 window.location.href = "index.html";

@@ -153,7 +153,6 @@ def dashboard():
                 created_at
             FROM users
             ORDER BY id DESC
-            LIMIT 5
             """
         )
         recent_users = cursor.fetchall()
@@ -171,10 +170,21 @@ def dashboard():
                 updated_at
             FROM books
             ORDER BY updated_at DESC, id DESC
-            LIMIT 5
             """
         )
         recent_books = cursor.fetchall()
+
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS admin_activity (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                admin_username VARCHAR(100) NOT NULL,
+                action VARCHAR(100) NOT NULL,
+                details TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            """
+        )
 
         cursor.execute(
             """
@@ -186,7 +196,6 @@ def dashboard():
                 created_at
             FROM admin_activity
             ORDER BY id DESC
-            LIMIT 10
             """
         )
         activities = cursor.fetchall()
@@ -283,6 +292,152 @@ def get_users():
         if cursor:
             cursor.close()
 
+        if connection:
+            connection.close()
+
+
+@admin_bp.route("/users/<int:user_id>/reset-password", methods=["POST"])
+@admin_required
+def reset_user_password(user_id):
+    data = request.get_json(silent=True) or {}
+    password = data.get("password", "")
+
+    if not isinstance(password, str) or len(password) < 6:
+        return jsonify({
+            "success": False,
+            "message": "Password must be at least 6 characters"
+        }), 400
+
+    connection = None
+    cursor = None
+
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute(
+            "SELECT id, username FROM users WHERE id = %s",
+            (user_id,)
+        )
+        user = cursor.fetchone()
+
+        if not user:
+            return jsonify({
+                "success": False,
+                "message": "User not found"
+            }), 404
+
+        cursor.execute(
+            "UPDATE users SET password_hash = %s WHERE id = %s",
+            (generate_password_hash(password), user_id)
+        )
+        log_activity(
+            cursor,
+            "PASSWORD_RESET",
+            f"Reset password for user: {user['username']}"
+        )
+        connection.commit()
+
+        return jsonify({
+            "success": True,
+            "message": "Password reset successfully"
+        })
+
+    except mysql.connector.Error as error:
+        if connection:
+            connection.rollback()
+        return jsonify({
+            "success": False,
+            "message": "Database error",
+            "error": str(error)
+        }), 500
+
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+@admin_bp.route("/loans", methods=["GET"])
+@admin_required
+def get_admin_loans():
+    connection = cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS loans (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                user_id INT NOT NULL,
+                book_id INT NOT NULL,
+                borrowed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                due_date DATE NOT NULL,
+                duration_days INT NOT NULL DEFAULT 7,
+                returned_at DATETIME NULL
+            )
+        """)
+        cursor.execute("""
+            SELECT COUNT(*) AS column_exists
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+              AND table_name = 'loans'
+              AND column_name = 'duration_days'
+        """)
+        if cursor.fetchone()["column_exists"] == 0:
+            cursor.execute(
+                "ALTER TABLE loans ADD COLUMN duration_days INT NOT NULL DEFAULT 7"
+            )
+        cursor.execute("""
+            SELECT l.id, l.borrowed_at, l.due_date, l.duration_days, l.returned_at,
+                   u.username, u.name, b.title,
+                   GREATEST(DATEDIFF(CURDATE(), l.due_date), 0) AS overdue_days,
+                   GREATEST(DATEDIFF(CURDATE(), l.borrowed_at) - 10, 0) * 50 AS fine_inr,
+                   GREATEST(DATEDIFF(l.due_date, CURDATE()), 0) AS remaining_days
+            FROM loans l
+            JOIN users u ON u.id = l.user_id
+            JOIN books b ON b.id = l.book_id
+            ORDER BY l.returned_at IS NULL DESC, l.due_date ASC, l.id DESC
+        """)
+        loans = cursor.fetchall()
+        for loan in loans:
+            for key in ("borrowed_at", "due_date", "returned_at"):
+                if loan.get(key):
+                    loan[key] = loan[key].isoformat()
+        return jsonify(success=True, loans=loans, count=len(loans))
+    except mysql.connector.Error as error:
+        return jsonify(success=False, message="Database error", error=str(error)), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+@admin_bp.route("/fine-payments", methods=["GET"])
+@admin_required
+def get_fine_payments():
+    connection = cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT p.id, p.loan_id, p.amount, p.reference, p.status, p.created_at,
+                   u.username, b.title
+            FROM fine_payments p
+            JOIN users u ON u.id = p.user_id
+            JOIN loans l ON l.id = p.loan_id
+            JOIN books b ON b.id = l.book_id
+            ORDER BY p.id DESC
+        """)
+        payments = cursor.fetchall()
+        for payment in payments:
+            payment["created_at"] = payment["created_at"].isoformat()
+        return jsonify(success=True, payments=payments, count=len(payments))
+    except mysql.connector.Error as error:
+        return jsonify(success=False, message="Database error", error=str(error)), 500
+    finally:
+        if cursor:
+            cursor.close()
         if connection:
             connection.close()
 

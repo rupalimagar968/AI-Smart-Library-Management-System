@@ -479,3 +479,4 @@ def search_books():
 
         if connection:
             connection.close()
+

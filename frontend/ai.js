@@ -1,4 +1,25 @@
 const API_URL = "http://localhost:5000";
+const aiToken = sessionStorage.getItem("library_token") ||
+    localStorage.getItem("library_token") ||
+    localStorage.getItem("token");
+
+async function requireValidSession() {
+    if (!aiToken) {
+        window.location.replace("/");
+        return false;
+    }
+    const response = await fetch(`${API_URL}/api/my-loans`, {
+        headers: { Authorization: `Bearer ${aiToken}` }
+    });
+    if (response.status === 401 || response.status === 403) {
+        localStorage.removeItem("library_token");
+        sessionStorage.removeItem("library_token");
+        localStorage.removeItem("token");
+        window.location.replace("/");
+        return false;
+    }
+    return response.ok;
+}
 
 const chatMessages = document.getElementById("chatMessages");
 const chatInput = document.getElementById("chatInput");
@@ -206,3 +227,5 @@ chatInput.addEventListener("keypress", event => {
     }
 
 });
+
+requireValidSession();

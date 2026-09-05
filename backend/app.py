@@ -15,7 +15,29 @@ app.register_blueprint(books_bp)
 app.register_blueprint(admin_bp)
 
 JWT_SECRET = os.getenv("JWT_SECRET", "change-this-secret")
-JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
+JWT_EXPIRATION_HOURS = int(os.getenv("JWT_EXPIRATION_HOURS", "3"))
+
+
+@app.before_request
+def require_api_session():
+    if not request.path.startswith("/api/") or request.method == "OPTIONS":
+        return None
+
+    public_paths = {
+        "/api/login",
+        "/api/register",
+        "/api/forgot-password",
+    }
+    if request.path in public_paths:
+        return None
+
+    if current_user() is None:
+        return jsonify({
+            "success": False,
+            "message": "Login required"
+        }), 401
+
+    return None
 
 
 def get_db_connection():
@@ -56,7 +78,7 @@ def api_health():
 def register():
     data = request.get_json(silent=True) or {}
 
-    name = str(data.get("name", "")).strip()
+    name = str(data.get("name", data.get("username", ""))).strip()
     password = data.get("password", "")
     email = str(data.get("email", "")).strip()
 
@@ -258,7 +280,7 @@ def login():
 def forgot_password():
     data = request.get_json(silent=True) or {}
 
-    name = str(data.get("name", "")).strip()
+    name = str(data.get("name", data.get("username", ""))).strip()
     email = str(data.get("email", "")).strip()
     new_password = data.get("new_password", "")
 
@@ -341,6 +363,12 @@ def forgot_password():
 
 @app.route("/api/books", methods=["GET"])
 def get_books():
+    if current_user() is None:
+        return jsonify({
+            "success": False,
+            "message": "Login required"
+        }), 401
+
     connection = None
     cursor = None
 
@@ -380,25 +408,19 @@ def get_books():
             params.append(language)
 
         if search:
-            query += """
-                AND (
-                    title LIKE %s
-                    OR author LIKE %s
-                    OR category LIKE %s
-                    OR language LIKE %s
-                    OR isbn LIKE %s
-                )
-            """
-
-            search_value = f"%{search}%"
-
-            params.extend([
-                search_value,
-                search_value,
-                search_value,
-                search_value,
-                search_value
-            ])
+            search_terms = [term for term in search.split() if term]
+            for term in search_terms:
+                query += """
+                    AND (
+                        title LIKE %s
+                        OR author LIKE %s
+                        OR category LIKE %s
+                        OR language LIKE %s
+                        OR isbn LIKE %s
+                    )
+                """
+                search_value = f"%{term}%"
+                params.extend([search_value] * 5)
 
         query += " ORDER BY id DESC"
 
@@ -778,6 +800,378 @@ def delete_book(book_id):
 
         if connection:
             connection.close()
+
+
+# ============================================================
+# BORROWING API
+# ============================================================
+
+def current_user():
+    authorization = request.headers.get("Authorization", "")
+    if not authorization.startswith("Bearer "):
+        return None
+    try:
+        return jwt.decode(authorization.split(" ", 1)[1].strip(),
+                          JWT_SECRET, algorithms=["HS256"])
+    except jwt.InvalidTokenError:
+        return None
+
+
+def ensure_loans_table(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS loans (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            book_id INT NOT NULL,
+            borrowed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            due_date DATE NOT NULL,
+            duration_days INT NOT NULL,
+            returned_at DATETIME NULL,
+            INDEX idx_loans_user_active (user_id, returned_at),
+            INDEX idx_loans_book_active (book_id, returned_at)
+        )
+    """)
+    cursor.execute("""
+        SELECT COUNT(*) AS column_exists
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'loans'
+          AND column_name = 'duration_days'
+    """)
+    if cursor.fetchone()["column_exists"] == 0:
+        cursor.execute(
+            "ALTER TABLE loans ADD COLUMN duration_days INT NOT NULL DEFAULT 7"
+        )
+
+
+def ensure_payments_table(cursor):
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS fine_payments (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            user_id INT NOT NULL,
+            loan_id INT NOT NULL,
+            amount INT NOT NULL,
+            reference VARCHAR(120) NOT NULL,
+            payment_method VARCHAR(20) NOT NULL DEFAULT 'UPI',
+            status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+            created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    cursor.execute("""
+        SELECT COUNT(*) AS column_exists
+        FROM information_schema.columns
+        WHERE table_schema = DATABASE()
+          AND table_name = 'fine_payments'
+          AND column_name = 'payment_method'
+    """)
+    if cursor.fetchone()["column_exists"] == 0:
+        cursor.execute(
+            "ALTER TABLE fine_payments ADD COLUMN payment_method VARCHAR(20) NOT NULL DEFAULT 'UPI'"
+        )
+
+
+def loan_payload(row):
+    overdue_days = max((datetime.now().date() - row["due_date"]).days, 0)
+    # Fines start only after the ten-day maximum loan period.
+    elapsed_overdue = max((datetime.now().date() -
+                           row["borrowed_at"].date()).days - 10, 0)
+    return {
+        "id": row["id"], "loan_id": row["id"], "book_id": row["book_id"],
+        "title": row.get("title"), "author": row.get("author"),
+        "borrowed_at": row["borrowed_at"].isoformat(),
+        "due_date": row["due_date"].isoformat(),
+        "duration_days": row.get("duration_days"),
+        "remaining_days": max((row["due_date"] - datetime.now().date()).days, 0),
+        "returned_at": row["returned_at"].isoformat() if row.get("returned_at") else None,
+        "overdue_days": overdue_days,
+        "fine": elapsed_overdue * 50,
+        "fine_inr": elapsed_overdue * 50
+    }
+
+
+@app.route("/api/borrow", methods=["POST"])
+@app.route("/api/loans", methods=["POST"])
+@app.route("/api/books/<int:book_id>/borrow", methods=["POST"])
+def borrow_book():
+    user = current_user()
+    if not user:
+        return jsonify(success=False, message="Authentication required"), 401
+    data = request.get_json(silent=True) or {}
+    try:
+        book_id = int(data.get("book_id", request.view_args.get("book_id")))
+        days = int(data.get("duration_days", data.get("borrow_days",
+                                                        data.get("days", 7))))
+    except (TypeError, ValueError):
+        return jsonify(success=False, message="Book ID and duration are required"), 400
+    if days < 2 or days > 10:
+        return jsonify(success=False, message="Borrow duration must be between 2 and 10 days"), 400
+
+    connection = cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        ensure_loans_table(cursor)
+        connection.start_transaction()
+        cursor.execute("SELECT id, available_quantity FROM books WHERE id=%s FOR UPDATE", (book_id,))
+        book = cursor.fetchone()
+        if not book:
+            return jsonify(success=False, message="Book not found"), 404
+        cursor.execute("SELECT COUNT(*) AS count FROM loans WHERE user_id=%s AND returned_at IS NULL",
+                       (user["user_id"],))
+        if cursor.fetchone()["count"] >= 4:
+            connection.rollback()
+            return jsonify(success=False, error="quota_completed",
+                           code="QUOTA_COMPLETED",
+                           message="Borrowing quota completed (maximum 4 active books)"), 409
+        if book["available_quantity"] < 1:
+            connection.rollback()
+            return jsonify(success=False, message="Book is currently unavailable"), 409
+        cursor.execute("""
+            SELECT id FROM loans WHERE user_id=%s AND book_id=%s AND returned_at IS NULL
+        """, (user["user_id"], book_id))
+        if cursor.fetchone():
+            connection.rollback()
+            return jsonify(success=False, message="You already have this book"), 409
+        cursor.execute("""
+            INSERT INTO loans (user_id, book_id, borrowed_at, due_date, duration_days)
+            VALUES (%s, %s, NOW(), DATE_ADD(CURDATE(), INTERVAL %s DAY), %s)
+        """, (user["user_id"], book_id, days, days))
+        loan_id = cursor.lastrowid
+        cursor.execute("UPDATE books SET available_quantity=available_quantity-1 WHERE id=%s", (book_id,))
+        connection.commit()
+        return jsonify(success=True, message="Book borrowed successfully",
+                       loan_id=loan_id, due_date=(datetime.now().date() +
+                       timedelta(days=days)).isoformat()), 201
+    except mysql.connector.Error as error:
+        if connection: connection.rollback()
+        return jsonify(success=False, message="Database error", error=str(error)), 500
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+
+@app.route("/api/loans", methods=["GET"])
+@app.route("/api/my-loans", methods=["GET"])
+def get_loans():
+    user = current_user()
+    if not user:
+        return jsonify(success=False, message="Authentication required"), 401
+    connection = cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        ensure_loans_table(cursor)
+        cursor.execute("""
+            SELECT l.*, b.title, b.author FROM loans l
+            JOIN books b ON b.id=l.book_id
+            WHERE l.user_id=%s AND l.returned_at IS NULL ORDER BY l.due_date
+        """, (user["user_id"],))
+        rows = cursor.fetchall()
+        cursor.execute(
+            "SELECT loan_id FROM fine_payments WHERE user_id=%s AND status='PAID'",
+            (user["user_id"],)
+        )
+        paid_loans = {row["loan_id"] for row in cursor.fetchall()}
+        loans = []
+        for row in rows:
+            payload = loan_payload(row)
+            if row["id"] in paid_loans:
+                payload["fine"] = 0
+                payload["fine_inr"] = 0
+                payload["payment_cleared"] = True
+            loans.append(payload)
+        return jsonify(success=True, loans=loans,
+                       active_count=len(rows), quota=4)
+    except mysql.connector.Error as error:
+        return jsonify(success=False, message="Database error", error=str(error)), 500
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+
+@app.route("/api/return", methods=["POST"])
+@app.route("/api/loans/<int:loan_id>/return", methods=["POST"])
+def return_book(loan_id=None):
+    user = current_user()
+    if not user:
+        return jsonify(success=False, message="Authentication required"), 401
+    data = request.get_json(silent=True) or {}
+    if loan_id is None:
+        loan_id = data.get("loan_id")
+    connection = cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        ensure_loans_table(cursor)
+        connection.start_transaction()
+        if loan_id:
+            cursor.execute("SELECT * FROM loans WHERE id=%s AND user_id=%s AND returned_at IS NULL FOR UPDATE",
+                           (int(loan_id), user["user_id"]))
+        else:
+            cursor.execute("SELECT * FROM loans WHERE book_id=%s AND user_id=%s AND returned_at IS NULL FOR UPDATE",
+                           (int(data.get("book_id")), user["user_id"]))
+        loan = cursor.fetchone()
+        if not loan:
+            connection.rollback()
+            return jsonify(success=False, message="Active loan not found"), 404
+        overdue_days = max((datetime.now().date() - loan["borrowed_at"].date()).days - 10, 0)
+        fine = overdue_days * 50
+        cursor.execute("UPDATE loans SET returned_at=NOW() WHERE id=%s", (loan["id"],))
+        cursor.execute("UPDATE books SET available_quantity=available_quantity+1 WHERE id=%s", (loan["book_id"],))
+        connection.commit()
+        return jsonify(success=True, message="Book returned successfully",
+                       fine=fine, fine_inr=fine, overdue_days=overdue_days)
+    except (ValueError, TypeError, mysql.connector.Error) as error:
+        if connection: connection.rollback()
+        return jsonify(success=False, message="Database error", error=str(error)), 500
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
+
+
+@app.route("/api/fine-payments", methods=["POST"])
+def submit_fine_payment():
+    user = current_user()
+    if not user:
+        return jsonify(success=False, message="Authentication required"), 401
+    data = request.get_json(silent=True) or {}
+    try:
+        loan_id = int(data.get("loan_id"))
+        amount = int(data.get("amount"))
+    except (TypeError, ValueError):
+        return jsonify(success=False, message="Loan and payment amount are required"), 400
+    reference = str(data.get("reference", "")).strip()
+    payment_method = str(data.get("payment_method", "UPI")).upper().strip()
+    if payment_method not in ("UPI", "CASH"):
+        return jsonify(success=False, message="Invalid payment method"), 400
+    if payment_method == "CASH" and not reference:
+        reference = "CASH"
+    if not reference:
+        reference = "ONLINE" if payment_method == "UPI" else "CASH"
+    if amount < 1:
+        return jsonify(success=False, message="Payment amount is required"), 400
+
+    connection = cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        ensure_loans_table(cursor)
+        ensure_payments_table(cursor)
+        cursor.execute("""
+            SELECT l.id, GREATEST(DATEDIFF(CURDATE(), l.borrowed_at) - 10, 0) * 50 AS fine
+            FROM loans l
+            WHERE l.id=%s AND l.user_id=%s AND l.returned_at IS NULL
+        """, (loan_id, user["user_id"]))
+        loan = cursor.fetchone()
+        if not loan:
+            return jsonify(success=False, message="Active loan not found"), 404
+        if amount != loan["fine"] or amount < 1:
+            return jsonify(success=False, message=f"Payment amount must be ₹{loan['fine']}"), 400
+        cursor.execute("""
+            SELECT id FROM fine_payments
+            WHERE user_id=%s AND loan_id=%s AND status='PAID'
+        """, (user["user_id"], loan_id))
+        if cursor.fetchone():
+            return jsonify(success=False, message="This fine is already cleared"), 409
+        cursor.execute("""
+            INSERT INTO fine_payments
+                (user_id, loan_id, amount, reference, payment_method, status)
+            VALUES (%s, %s, %s, %s, %s, 'PAID')
+        """, (user["user_id"], loan_id, amount, reference, payment_method))
+        payment_id = cursor.lastrowid
+        cursor.execute(
+            "UPDATE loans SET returned_at=NOW() WHERE id=%s AND returned_at IS NULL",
+            (loan_id,)
+        )
+        cursor.execute(
+            """
+            UPDATE books b
+            JOIN loans l ON l.book_id=b.id
+            SET b.available_quantity=LEAST(b.quantity, b.available_quantity+1)
+            WHERE l.id=%s
+            """,
+            (loan_id,)
+        )
+        connection.commit()
+        return jsonify(success=True, message="Payment completed",
+                       receipt_id=payment_id, status="PAID")
+    except mysql.connector.Error as error:
+        if connection:
+            connection.rollback()
+        return jsonify(success=False, message="Database error", error=str(error)), 500
+    finally:
+        if cursor:
+            cursor.close()
+        if connection:
+            connection.close()
+
+
+@app.route("/api/fine-payments/<int:payment_id>/receipt", methods=["GET"])
+def download_payment_receipt(payment_id):
+    user = current_user()
+    if not user:
+        return jsonify(success=False, message="Authentication required"), 401
+    connection = cursor = None
+    try:
+        connection = get_db_connection()
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT p.id, p.amount, p.payment_method, p.status, p.created_at,
+                   l.due_date, b.title, u.name
+            FROM fine_payments p
+            JOIN loans l ON l.id=p.loan_id
+            JOIN books b ON b.id=l.book_id
+            JOIN users u ON u.id=p.user_id
+            WHERE p.id=%s AND p.user_id=%s AND p.status='PAID'
+        """, (payment_id, user["user_id"]))
+        receipt = cursor.fetchone()
+        if not receipt:
+            return jsonify(success=False, message="Receipt not found"), 404
+        lines = [
+            "SMART DIGITAL LIBRARY",
+            "PAYMENT RECEIPT",
+            "",
+            f"Receipt No: {receipt['id']}",
+            f"Member: {receipt['name']}",
+            f"Book: {receipt['title']}",
+            f"Amount Paid: INR {receipt['amount']}",
+            f"Payment Mode: {receipt['payment_method']}",
+            f"Payment Date: {receipt['created_at']}",
+            f"Due Date: {receipt['due_date']}",
+            "Status: PAID / FINE CLEARED",
+        ]
+        pdf_lines = []
+        y = 760
+        for line in lines:
+            safe = line.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)")
+            pdf_lines.append(f"BT /F1 12 Tf 72 {y} Td ({safe}) Tj ET")
+            y -= 28
+        stream = "\n".join(pdf_lines).encode("latin-1", "replace")
+        objects = [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+            b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+            b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
+        ]
+        pdf = b"%PDF-1.4\n"
+        offsets = [0]
+        for index, obj in enumerate(objects, 1):
+            offsets.append(len(pdf))
+            pdf += f"{index} 0 obj\n".encode() + obj + b"\nendobj\n"
+        xref = len(pdf)
+        pdf += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
+        pdf += b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets[1:])
+        pdf += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode()
+        from flask import Response
+        return Response(pdf, mimetype="application/pdf", headers={
+            "Content-Disposition": f"attachment; filename=library-receipt-{payment_id}.pdf"
+        })
+    except mysql.connector.Error as error:
+        return jsonify(success=False, message="Database error", error=str(error)), 500
+    finally:
+        if cursor: cursor.close()
+        if connection: connection.close()
 
 if __name__ == "__main__":
     app.run(

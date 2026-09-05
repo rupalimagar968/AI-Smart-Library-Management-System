@@ -50,6 +50,12 @@
                 Activity
             </button>
 
+            <button class="admin-nav-item"
+                    onclick="showAdminSection('loans', this)">
+                <span>📋</span>
+                Borrowed Books
+            </button>
+
         </nav>
 
         <div class="admin-sidebar-bottom">
@@ -209,6 +215,7 @@
                                 <th>ID</th>
                                 <th>User</th>
                                 <th>Email</th>
+                                <th>Password</th>
                                 <th>Created</th>
                                 <th>Action</th>
                             </tr>
@@ -297,9 +304,36 @@
                 </div>
 
                 <div id="activityList" class="activity-list"></div>
+                <h2>Fine Payment Receipts</h2>
+                <div class="admin-table-wrapper">
+                    <table class="admin-table">
+                        <thead><tr><th>User</th><th>Book</th><th>Amount</th><th>Method</th><th>Reference</th><th>Status</th><th>Date</th></tr></thead>
+                        <tbody id="paymentsTable"></tbody>
+                    </table>
+                </div>
 
             </div>
 
+        </section>
+
+        <section id="loansSection" class="admin-section">
+            <div class="admin-panel">
+                <div class="admin-panel-header">
+                    <div>
+                        <span>LOAN MANAGEMENT</span>
+                        <h2>All Borrowed Books</h2>
+                    </div>
+                </div>
+                <div class="admin-table-wrapper">
+                    <table class="admin-table">
+                        <thead><tr>
+                            <th>User</th><th>Book</th><th>Borrowed</th>
+                            <th>Duration</th><th>Due Date</th><th>Status</th><th>Fine</th>
+                        </tr></thead>
+                        <tbody id="loansTable"></tbody>
+                    </table>
+                </div>
+            </div>
         </section>
 
     </main>

@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Books - Smart Digital Library</title>
     <link rel="stylesheet" href="style.css">
+    <script>
+        if (!localStorage.getItem("library_token") &&
+            !sessionStorage.getItem("library_token") &&
+            !localStorage.getItem("token")) {
+            window.location.replace("/");
+        }
+    </script>
 </head>
 
 <body>
@@ -41,6 +48,21 @@
     <a href="ai.html" class="btn btn-primary">🤖 Ask AI</a>
 </section>
 
+<section id="myLoansPanel" class="library-panel loans-panel featured-loans-panel">
+    <div class="loans-highlight">
+        <div>
+            <span class="section-label">YOUR LIBRARY DASHBOARD</span>
+            <h2>My Borrowed Books <span id="loansCount"></span></h2>
+            <p>Track your books, due dates, remaining days and fines in one place.</p>
+        </div>
+        <div class="loans-quota" aria-label="Borrowing quota">
+            <strong id="loansQuota">0/4</strong>
+            <small>active books</small>
+        </div>
+    </div>
+    <div id="loansList"><p class="muted">Loading your borrowed books...</p></div>
+</section>
+
 <section class="library-panel">
 
     <div class="search-bar">
@@ -49,9 +71,16 @@
             id="searchInput"
             type="text"
             placeholder="Search by title, author or ISBN..."
+            list="bookSearchSuggestions"
+            autocomplete="off"
+            aria-label="Search books by title, author, category or ISBN"
         >
+        <datalist id="bookSearchSuggestions"></datalist>
         <button onclick="applyFilters()">Search</button>
     </div>
+    <p id="searchHint" class="search-hint">
+        Smart search checks title, author, category, language and ISBN.
+    </p>
 
     <div class="filter-row">
 
@@ -86,6 +115,23 @@
 
 </main>
 
+<div id="loginPrompt" class="login-prompt" role="dialog" aria-modal="true"
+     aria-labelledby="loginPromptTitle">
+    <div class="login-prompt-card">
+        <button type="button" class="login-prompt-close"
+                onclick="closeLoginPrompt()" aria-label="Close">×</button>
+        <div class="login-prompt-icon">🔐</div>
+        <h2 id="loginPromptTitle">Please log in</h2>
+        <p>You must log in before borrowing a book.</p>
+        <div class="login-prompt-actions">
+            <button type="button" class="btn btn-secondary"
+                    onclick="closeLoginPrompt()">Cancel</button>
+            <button type="button" class="btn btn-primary"
+                    onclick="continueToLogin()">OK</button>
+        </div>
+    </div>
+</div>
+
 <footer>
     <div class="footer-inner">
         <div class="brand dark-brand">
@@ -97,6 +143,7 @@
     </div>
 </footer>
 
+<script src="session.js"></script>
 <script src="books.js"></script>
 
 </body>

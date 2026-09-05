@@ -1,4 +1,4 @@
-const ADMIN_API = "";
+const ADMIN_API = "http://localhost:5000";
 
 const adminToken =
     localStorage.getItem("library_token") ||
@@ -10,7 +10,7 @@ const isAdmin =
     sessionStorage.getItem("is_admin") === "true";
 
 if (!adminToken || !isAdmin) {
-    window.location.replace("index.html");
+    window.location.replace("welcome.html");
 }
 
 
@@ -218,7 +218,7 @@ async function loadUsers() {
 
             table.innerHTML = `
                 <tr>
-                    <td colspan="5" class="table-empty">
+                    <td colspan="6" class="table-empty">
                         No users found.
                     </td>
                 </tr>
@@ -269,24 +269,43 @@ async function loadUsers() {
                     </td>
 
                     <td>
-                        ${formatDate(user.created_at)}
+                    <button
+                        class="password-status"
+                        type="button"
+                        title="Passwords are stored securely and cannot be revealed"
+                        onclick="showAdminMessage('Passwords cannot be revealed. Use Reset Password to set a new one.', 'error')">
+                        •••••• 👁
+                    </button>
+                    </td>
+
+                    <td>
+                    ${formatDate(user.created_at)}
                     </td>
 
                     <td>
 
-                        ${
-                            isAdmin
+                    ${
+                        isAdmin
 
-                            ? `<span class="protected-badge">
-                                Protected
-                               </span>`
-
-                            : `<button
-                                class="danger-btn"
-                                onclick="deleteUser(${user.id}, '${escapeJs(user.username)}')">
-                                Delete
-                               </button>`
-                        }
+                        ? `<div class="table-actions">
+                            <span class="protected-badge">Protected</span>
+                            <button
+                                class="edit-btn"
+                                onclick="resetUserPassword(${user.id}, '${escapeJs(user.username)}')">
+                                Reset Password
+                            </button>
+                           </div>`
+                        : `<button
+                            class="danger-btn"
+                            onclick="deleteUser(${user.id}, '${escapeJs(user.username)}')">
+                            Delete
+                           </button>
+                           <button
+                               class="edit-btn"
+                               onclick="resetUserPassword(${user.id}, '${escapeJs(user.username)}')">
+                               Reset Password
+                           </button>`
+                    }
 
                     </td>
 
@@ -299,6 +318,37 @@ async function loadUsers() {
 
         console.error(error);
 
+    }
+
+}
+
+
+async function resetUserPassword(id, username) {
+    const password = prompt(
+        `Enter a new password for "${username}" (minimum 6 characters):`
+    );
+
+    if (password === null) return;
+
+    if (password.length < 6) {
+        showAdminMessage("Password must be at least 6 characters.", "error");
+        return;
+    }
+
+    const confirmation = prompt("Re-enter the new password to confirm:");
+    if (confirmation !== password) {
+        showAdminMessage("Passwords do not match.", "error");
+        return;
+    }
+
+    try {
+        const data = await apiRequest(`/api/admin/users/${id}/reset-password`, {
+            method: "POST",
+            body: JSON.stringify({ password })
+        });
+        showAdminMessage(data.message);
+    } catch (error) {
+        showAdminMessage(error.message, "error");
     }
 }
 
@@ -710,8 +760,55 @@ function showAdminSection(section, button) {
 
     if (section === "activity") {
         loadDashboard();
+        loadFinePayments();
     }
 
+    async function loadFinePayments() {
+        try {
+            const data = await apiRequest("/api/admin/fine-payments");
+            const table = document.getElementById("paymentsTable");
+            table.innerHTML = data.payments.length ? data.payments.map(payment => `
+                <tr>
+                    <td>${escapeHtml(payment.username)}</td>
+                    <td>${escapeHtml(payment.title)}</td>
+                    <td>₹${payment.amount}</td>
+                    <td>${escapeHtml(payment.payment_method)}</td>
+                    <td>${escapeHtml(payment.reference)}</td>
+                    <td>${escapeHtml(payment.status)}</td>
+                    <td>${formatDate(payment.created_at)}</td>
+                </tr>
+            `).join("") : `<tr><td colspan="7" class="table-empty">No payment receipts submitted.</td></tr>`;
+        } catch (error) {
+            showAdminMessage(error.message, "error");
+        }
+    }
+
+    if (section === "loans") {
+        loadAdminLoans();
+    }
+
+}
+
+async function loadAdminLoans() {
+    try {
+        const data = await apiRequest("/api/admin/loans");
+        const table = document.getElementById("loansTable");
+        table.innerHTML = data.loans.length ? data.loans.map(loan => `
+            <tr>
+                <td>${escapeHtml(loan.username || loan.name)}</td>
+                <td>${escapeHtml(loan.title)}</td>
+                <td>${formatDate(loan.borrowed_at)}</td>
+                <td>${loan.duration_days} days</td>
+                <td>${formatDate(loan.due_date)}</td>
+                <td>${loan.returned_at ? "Returned" :
+                    loan.remaining_days > 0 ? `${loan.remaining_days} days remaining` :
+                    `${loan.overdue_days} days overdue`}</td>
+                <td>₹${loan.fine_inr}</td>
+            </tr>
+        `).join("") : `<tr><td colspan="7" class="table-empty">No borrowed books found.</td></tr>`;
+    } catch (error) {
+        showAdminMessage(error.message, "error");
+    }
 }
 
 

@@ -5,6 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Smart Digital Library</title>
     <link rel="stylesheet" href="style.css">
+    <script>
+        if (!localStorage.getItem("library_token") &&
+            !sessionStorage.getItem("library_token") &&
+            !localStorage.getItem("token")) {
+            window.location.replace("/");
+        }
+    </script>
 </head>
 
 <body>
@@ -134,6 +141,18 @@
     </div>
 </section>
 
+<section class="account-dashboard" id="accountDashboard">
+    <div class="account-dashboard-header">
+        <div>
+            <span class="section-label">MY ACCOUNT</span>
+            <h2>Your borrowed books</h2>
+            <p id="accountSummary">Loading your account information...</p>
+        </div>
+        <a href="books.html" class="btn btn-primary">Explore Books →</a>
+    </div>
+    <div id="accountLoans" class="account-loan-table"></div>
+</section>
+
 <section class="stats-section">
     <div class="stats-grid">
         <div class="stat-card">
@@ -235,6 +254,7 @@
     </div>
 </footer>
 
+<script src="session.js"></script>
 <script src="script.js"></script>
 
 </body>
