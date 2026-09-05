@@ -155,8 +155,8 @@ Backend environment variables:
 | `DB_PORT` | `3306` | MySQL port |
 | `DB_NAME` | `smart_library` | Database name |
 | `DB_USER` | `library_user` | Database user |
-| `DB_PASSWORD` | empty | Database password |
-| `JWT_SECRET` | `change-this-secret` | JWT signing secret; change in production |
+| `DB_PASSWORD` | Set privately | Database password; never commit it |
+| `JWT_SECRET` | Set privately | JWT signing secret; never commit it |
 | `JWT_EXPIRATION_HOURS` | `3` | Session lifetime |
 
 ## Run locally
@@ -172,8 +172,8 @@ $env:DB_HOST="localhost"
 $env:DB_PORT="3306"
 $env:DB_NAME="smart_library"
 $env:DB_USER="library_user"
-$env:DB_PASSWORD="library123"
-$env:JWT_SECRET="replace-with-a-secret"
+$env:DB_PASSWORD="<your-database-password>"
+$env:JWT_SECRET="<your-private-jwt-secret>"
 python app.py
 ```
 

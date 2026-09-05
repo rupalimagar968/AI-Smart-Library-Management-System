@@ -77,8 +77,8 @@ DB_HOST=localhost
 DB_PORT=3306
 DB_NAME=smart_library
 DB_USER=library_user
-DB_PASSWORD=library123
-JWT_SECRET=replace-with-a-secret
+DB_PASSWORD=<your-database-password>
+JWT_SECRET=<your-private-jwt-secret>
 JWT_EXPIRATION_HOURS=3
 ```
 
